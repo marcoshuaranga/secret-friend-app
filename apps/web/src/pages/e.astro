@@ -1,0 +1,198 @@
+---
+import Roulette from "@/components/Roulette.astro";
+import { Button } from "@/components/starwind/button";
+import { t } from "@/i18n/es";
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title="Tu amigo secreto">
+  <p id="loading" class="text-muted-foreground">{t.loading}</p>
+
+  <section id="error" class="flex flex-col gap-4" hidden>
+    <h1 class="text-2xl font-bold tracking-tight">Algo no salió bien</h1>
+    <p id="error-text" class="text-muted-foreground"></p>
+    <Button href="/" variant="outline">{t.backHome}</Button>
+  </section>
+
+  <header id="event-header" class="flex flex-col gap-1" hidden>
+    <h1 id="event-name" class="text-2xl font-bold tracking-tight text-balance"></h1>
+    <p id="event-meta" class="text-sm text-muted-foreground"></p>
+  </header>
+
+  <section id="pick" class="flex flex-col gap-4" hidden aria-labelledby="pick-title">
+    <div>
+      <h2 id="pick-title" class="text-lg font-semibold">{t.pickYourName}</h2>
+      <p class="text-sm text-muted-foreground">{t.pickHint}</p>
+    </div>
+    <ul id="names" class="grid grid-cols-2 gap-2"></ul>
+    <p id="pick-error" class="rounded-lg bg-error/10 p-3 text-sm text-error" role="alert" hidden></p>
+  </section>
+
+  <section id="spin" class="flex flex-col gap-4" hidden aria-label="Ruleta">
+    <p class="text-center text-sm text-muted-foreground">
+      Hola, <strong id="me-name" class="text-foreground"></strong>. Tu amigo secreto te espera.
+    </p>
+    <Roulette />
+    <p id="spin-error" class="text-sm text-error" role="alert" hidden></p>
+  </section>
+
+  <section id="result" class="flex flex-col items-center gap-4 text-center" hidden aria-live="polite">
+    <p class="text-sm font-medium tracking-wide text-muted-foreground uppercase">{t.youGiftTo}</p>
+    <p id="receiver" class="text-4xl font-extrabold tracking-tight text-primary text-balance"></p>
+    <Button id="calendar" variant="outline" hidden>{t.addToCalendar}</Button>
+    <p class="text-xs text-muted-foreground">{t.openInBrowser}</p>
+  </section>
+
+  <footer id="organizer" class="border-t pt-4 text-center text-sm" hidden>
+    <a id="organizer-link" class="font-medium text-primary underline-offset-4 hover:underline"></a>
+  </footer>
+
+  <dialog
+    id="confirm"
+    class="m-auto w-[min(22rem,calc(100%-2rem))] rounded-2xl border bg-card p-6 text-card-foreground shadow-xl backdrop:bg-black/50"
+    aria-labelledby="confirm-title"
+  >
+    <form method="dialog" class="flex flex-col gap-4">
+      <h2 id="confirm-title" class="text-xl font-semibold"></h2>
+      <p class="text-sm text-muted-foreground">{t.confirmHint}</p>
+      <div class="flex flex-col gap-2">
+        <Button type="submit" value="yes" variant="primary">{t.yes}</Button>
+        <Button type="submit" value="no" variant="ghost">{t.cancel}</Button>
+      </div>
+    </form>
+  </dialog>
+</Layout>
+
+<script>
+  import type { PublicEvent } from "@secret-friend/contract";
+  import { buildReel, secureRandomInt } from "@secret-friend/core";
+  import { errorText, t } from "@/i18n/es";
+  import { api, type ClientError } from "@/lib/api";
+  import { $, el, formatDate, show, tokenFromUrl } from "@/lib/dom";
+  import { fingerprint } from "@/lib/fingerprint";
+  import { download, icsFor } from "@/lib/ics";
+
+  interface Roulette extends HTMLElement {
+    preview(names: readonly string[]): void;
+    play(reel: readonly string[], force?: number): Promise<void>;
+    reset(): void;
+  }
+
+  const token = tokenFromUrl();
+  const sections = ["#loading", "#error", "#pick", "#spin", "#result"] as const;
+  const only = (id: (typeof sections)[number]) => {
+    for (const s of sections) show($(s), s === id);
+  };
+
+  const fail = (error: ClientError) => {
+    $("#error-text").textContent = errorText[error.error];
+    show($("#event-header"), false);
+    only("#error");
+  };
+
+  const renderHeader = (event: PublicEvent) => {
+    $("#event-name").textContent = event.name;
+    $("#event-meta").textContent = [
+      event.date ? formatDate(event.date) : undefined,
+      event.budget ? `Presupuesto: ${event.budget}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    show($("#event-header"));
+    const link = $<HTMLAnchorElement>("#organizer-link");
+    link.href = `/admin?t=${encodeURIComponent(token)}`;
+    link.textContent = event.isAdmin ? "Administrar el evento" : t.imOrganizer;
+    show($("#organizer"));
+  };
+
+  const renderResult = (event: PublicEvent, receiver: string) => {
+    $("#receiver").textContent = receiver;
+    const calendar = $<HTMLButtonElement>("#calendar");
+    if (event.date) {
+      show(calendar);
+      calendar.onclick = () =>
+        event.date &&
+        download("amigo-secreto.ics", icsFor(event.name, event.date, event.budget), "text/calendar");
+    }
+    only("#result");
+  };
+
+  const startRoulette = (event: PublicEvent, myName: string) => {
+    $("#me-name").textContent = myName;
+    const roulette = $<Roulette>("sf-roulette");
+    customElements.whenDefined("sf-roulette").then(() =>
+      roulette.preview(event.participants.filter((p) => p.name !== myName).map((p) => p.name)),
+    );
+    roulette.addEventListener("sf-spin-request", async (e) => {
+      const force = (e as CustomEvent<{ force: number }>).detail.force;
+      const result = await api.result(token);
+      if (!result.ok) {
+        $("#spin-error").textContent = errorText[result.error.error];
+        show($("#spin-error"));
+        roulette.reset();
+        return;
+      }
+      const reel = buildReel(secureRandomInt)(result.value.receiver, result.value.others);
+      await roulette.play(reel, force);
+      setTimeout(() => renderResult(event, result.value.receiver), 1600);
+    });
+    only("#spin");
+  };
+
+  const showMine = async (event: PublicEvent, participantId: string, revealed: boolean) => {
+    const myName = event.participants.find((p) => p.id === participantId)?.name ?? "";
+    if (!revealed) return startRoulette(event, myName);
+    const result = await api.result(token);
+    if (result.ok) renderResult(event, result.value.receiver);
+    else fail(result.error);
+  };
+
+  const renderPick = (event: PublicEvent) => {
+    const dialog = $<HTMLDialogElement>("#confirm");
+    $("#names").replaceChildren(
+      ...event.participants.map((p) => {
+        const button = el("button", {
+          type: "button",
+          className:
+            "flex min-h-14 w-full items-center justify-between gap-2 rounded-xl border bg-card px-4 text-left font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50",
+        }, [el("span", { className: "truncate", textContent: p.name })]);
+        if (p.taken) {
+          button.disabled = true;
+          button.append(
+            el("span", {
+              className: "shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs",
+              textContent: t.taken,
+            }),
+          );
+        }
+        button.addEventListener("click", () => {
+          $("#confirm-title").textContent = t.confirmName(p.name);
+          dialog.returnValue = "";
+          dialog.onclose = async () => {
+            if (dialog.returnValue !== "yes") return;
+            const claimed = await api.claim(token, p.id, await fingerprint());
+            if (claimed.ok) return showMine(event, p.id, false);
+            $("#pick-error").textContent = errorText[claimed.error.error];
+            show($("#pick-error"));
+            if (claimed.error.error === "NAME_TAKEN") void load();
+          };
+          dialog.showModal();
+        });
+        return el("li", {}, [button]);
+      }),
+    );
+    only("#pick");
+  };
+
+  const load = async () => {
+    if (!token) return fail({ error: "NOT_FOUND" });
+    const loaded = await api.getEvent(token);
+    if (!loaded.ok) return fail(loaded.error);
+    const event = loaded.value;
+    renderHeader(event);
+    if (event.me) return showMine(event, event.me.participantId, event.me.revealed);
+    renderPick(event);
+  };
+
+  void load();
+</script>

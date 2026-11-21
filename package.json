@@ -10,7 +10,8 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r --if-present test",
     "check": "biome check .",
-    "verify": "pnpm check && pnpm typecheck && pnpm test && pnpm build"
+    "verify": "pnpm check && pnpm typecheck && pnpm test && pnpm build",
+    "test:e2e": "pnpm --filter @secret-friend/web build && pnpm --filter @secret-friend/e2e test:e2e"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.8"

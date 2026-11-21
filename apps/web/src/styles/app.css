@@ -1,0 +1,23 @@
+/* Tema propio sobre Starwind: neutro y moderno, con un acento índigo. */
+:root {
+  --primary: var(--color-indigo-600);
+  --primary-accent: var(--color-indigo-600);
+  --outline: var(--color-indigo-500);
+  --radius: 0.875rem;
+}
+
+.dark {
+  --primary: var(--color-indigo-500);
+  --primary-accent: var(--color-indigo-400);
+  --outline: var(--color-indigo-400);
+}
+
+html {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Fuera de capas: gana a las utilidades de Tailwind (que viven en `@layer`). */
+[hidden] {
+  display: none;
+}

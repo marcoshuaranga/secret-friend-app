@@ -1,0 +1,257 @@
+---
+import { Button } from "@/components/starwind/button";
+import { Input } from "@/components/starwind/input";
+import { Label } from "@/components/starwind/label";
+import { t } from "@/i18n/es";
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title="Panel del organizador">
+  <p id="loading" class="text-muted-foreground">{t.loading}</p>
+
+  <section id="error" class="flex flex-col gap-4" hidden>
+    <h1 class="text-2xl font-bold tracking-tight">Algo no salió bien</h1>
+    <p id="error-text" class="text-muted-foreground"></p>
+    <Button href="/" variant="outline">{t.backHome}</Button>
+  </section>
+
+  <section id="login" class="flex flex-col gap-4" hidden>
+    <h1 class="text-2xl font-bold tracking-tight">Panel del organizador</h1>
+    <p class="text-muted-foreground">
+      Este dispositivo no administra <strong id="login-event" class="text-foreground"></strong>.
+      Escribe la contraseña de organizador para entrar.
+    </p>
+    <form id="login-form" class="flex flex-col gap-3">
+      <Label for="login-password">{t.password}</Label>
+      <Input id="login-password" name="password" type="password" required autocomplete="current-password" />
+      <p id="login-error" class="text-sm text-error" role="alert"></p>
+      <Button type="submit" variant="primary">{t.enter}</Button>
+    </form>
+  </section>
+
+  <section id="panel" class="flex flex-col gap-6" hidden>
+    <header class="flex flex-col gap-1">
+      <p class="text-sm font-medium text-muted-foreground">Panel del organizador</p>
+      <h1 id="panel-name" class="text-2xl font-bold tracking-tight text-balance"></h1>
+      <p id="panel-expires" class="text-sm text-muted-foreground"></p>
+    </header>
+
+    <div class="flex flex-col gap-2">
+      <div class="flex items-baseline justify-between text-sm">
+        <span id="progress-text" class="font-medium"></span>
+      </div>
+      <div class="h-2 overflow-hidden rounded-full bg-muted" role="presentation">
+        <div id="progress-bar" class="h-full rounded-full bg-primary transition-all"></div>
+      </div>
+    </div>
+
+    <div class="flex gap-2">
+      <Button id="copy" variant="primary" class="flex-1">{t.copy}</Button>
+      <Button id="open-event" variant="outline" class="flex-1">Abrir el evento</Button>
+    </div>
+
+    <section aria-labelledby="people-title" class="flex flex-col gap-2">
+      <h2 id="people-title" class="font-semibold">Participantes</h2>
+      <ul id="people" class="flex flex-col divide-y rounded-xl border"></ul>
+      <p class="text-xs text-muted-foreground">
+        Nunca se muestra a quién le tocó cada uno. Libera un nombre si alguien eligió mal o
+        cambió de teléfono: podrá elegirlo de nuevo.
+      </p>
+    </section>
+
+    <section aria-labelledby="edit-title" class="flex flex-col gap-3">
+      <h2 id="edit-title" class="font-semibold">Datos del evento</h2>
+      <form id="edit" class="flex flex-col gap-3">
+        <div class="flex flex-col gap-2">
+          <Label for="edit-name">Nombre</Label>
+          <Input id="edit-name" name="name" maxlength={80} required />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="flex flex-col gap-2">
+            <Label for="edit-date">{t.date}</Label>
+            <Input id="edit-date" name="date" type="date" />
+          </div>
+          <div class="flex flex-col gap-2">
+            <Label for="edit-budget">{t.budget}</Label>
+            <Input id="edit-budget" name="budget" maxlength={40} />
+          </div>
+        </div>
+        <p id="edit-status" class="text-sm" role="status"></p>
+        <Button type="submit" variant="secondary">Guardar cambios</Button>
+      </form>
+    </section>
+
+    <section aria-labelledby="danger-title" class="flex flex-col gap-3 rounded-xl border border-error/40 p-4">
+      <h2 id="danger-title" class="font-semibold text-error">Eliminar el evento</h2>
+      <p class="text-sm text-muted-foreground">
+        Se borran el sorteo y todos los datos. No se puede deshacer. Escribe el nombre del evento
+        para confirmar.
+      </p>
+      <form id="delete" class="flex flex-col gap-2">
+        <Input id="delete-confirm" name="confirm" autocomplete="off" aria-label="Nombre del evento" />
+        <Button type="submit" variant="error" id="delete-button" disabled>Eliminar</Button>
+      </form>
+    </section>
+  </section>
+
+  <dialog
+    id="confirm-release"
+    class="m-auto w-[min(22rem,calc(100%-2rem))] rounded-2xl border bg-card p-6 text-card-foreground shadow-xl backdrop:bg-black/50"
+    aria-labelledby="release-title"
+  >
+    <form method="dialog" class="flex flex-col gap-4">
+      <h2 id="release-title" class="text-xl font-semibold"></h2>
+      <p class="text-sm text-muted-foreground">
+        La persona podrá elegirlo otra vez desde cualquier dispositivo y volverá a girar la ruleta.
+        Su amigo secreto no cambia.
+      </p>
+      <div class="flex flex-col gap-2">
+        <Button type="submit" value="yes" variant="primary">Liberar</Button>
+        <Button type="submit" value="no" variant="ghost">{t.cancel}</Button>
+      </div>
+    </form>
+  </dialog>
+</Layout>
+
+<script>
+  import type { AdminParticipant, AdminView } from "@secret-friend/contract";
+  import { errorText, t } from "@/i18n/es";
+  import { api, type ClientError } from "@/lib/api";
+  import { $, el, eventUrl, show, tokenFromUrl } from "@/lib/dom";
+  import { fingerprint } from "@/lib/fingerprint";
+
+  const token = tokenFromUrl();
+  const sections = ["#loading", "#error", "#login", "#panel"] as const;
+  const only = (id: (typeof sections)[number]) => {
+    for (const s of sections) show($(s), s === id);
+  };
+
+  const fail = (error: ClientError) => {
+    $("#error-text").textContent = errorText[error.error];
+    only("#error");
+  };
+
+  const status = (p: AdminParticipant): string =>
+    p.revealed ? "Ya vio su amigo secreto" : p.claimed ? "Eligió su nombre" : "Pendiente";
+
+  const badgeClass = (p: AdminParticipant): string =>
+    p.revealed
+      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+      : p.claimed
+        ? "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200"
+        : "bg-muted text-muted-foreground";
+
+  const renderPeople = (view: AdminView) => {
+    const dialog = $<HTMLDialogElement>("#confirm-release");
+    $("#people").replaceChildren(
+      ...view.participants.map((p) => {
+        const row = el("li", { className: "flex items-center justify-between gap-3 px-4 py-3" }, [
+          el("span", { className: "flex min-w-0 flex-col" }, [
+            el("span", { className: "truncate font-medium", textContent: p.name }),
+            el("span", {
+              className: `mt-1 w-fit rounded-full px-2 py-0.5 text-xs font-medium ${badgeClass(p)}`,
+              textContent: status(p),
+            }),
+          ]),
+        ]);
+        if (p.claimed) {
+          const release = el("button", {
+            type: "button",
+            className: "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium hover:bg-muted",
+            textContent: "Liberar",
+          });
+          release.setAttribute("aria-label", `Liberar el nombre de ${p.name}`);
+          release.addEventListener("click", () => {
+            $("#release-title").textContent = `¿Liberar el nombre de ${p.name}?`;
+            dialog.returnValue = "";
+            dialog.onclose = async () => {
+              if (dialog.returnValue !== "yes") return;
+              const released = await api.release(token, p.id);
+              if (released.ok) void load();
+              else fail(released.error);
+            };
+            dialog.showModal();
+          });
+          row.append(release);
+        }
+        return row;
+      }),
+    );
+  };
+
+  const renderPanel = (view: AdminView) => {
+    $("#panel-name").textContent = view.name;
+    $("#panel-expires").textContent = `Se borrará automáticamente el ${new Date(view.expiresAt).toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" })}.`;
+    const seen = view.participants.filter((p) => p.revealed).length;
+    $("#progress-text").textContent = `${seen} de ${view.participants.length} ya vieron su amigo secreto`;
+    $("#progress-bar").style.width = `${(seen / view.participants.length) * 100}%`;
+    renderPeople(view);
+    $<HTMLInputElement>("#edit-name").value = view.name;
+    $<HTMLInputElement>("#edit-date").value = view.date ?? "";
+    $<HTMLInputElement>("#edit-budget").value = view.budget ?? "";
+    only("#panel");
+  };
+
+  const showLogin = async () => {
+    const event = await api.getEvent(token);
+    if (!event.ok) return fail(event.error);
+    $("#login-event").textContent = event.value.name;
+    const form = $<HTMLFormElement>("#login-form");
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const password = String(new FormData(form).get("password") ?? "");
+      const result = await api.login(event.value.id, password, await fingerprint());
+      if (result.ok) void load();
+      else $("#login-error").textContent = errorText[result.error.error];
+    };
+    only("#login");
+  };
+
+  const load = async () => {
+    if (!token) return fail({ error: "NOT_FOUND" });
+    const view = await api.admin(token);
+    if (view.ok) return renderPanel(view.value);
+    if (view.error.error === "UNAUTHORIZED") return showLogin();
+    fail(view.error);
+  };
+
+  const copy = $<HTMLButtonElement>("#copy");
+  copy.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(eventUrl(token));
+    copy.textContent = t.copied;
+    setTimeout(() => {
+      copy.textContent = t.copy;
+    }, 2000);
+  });
+  $("#open-event").addEventListener("click", () => {
+    location.href = `/e?t=${encodeURIComponent(token)}`;
+  });
+
+  const editForm = $<HTMLFormElement>("#edit");
+  editForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const data = new FormData(editForm);
+    const text = (key: string) => String(data.get(key) ?? "").trim();
+    const updated = await api.updateEvent(token, {
+      name: text("name"),
+      date: text("date") || null,
+      budget: text("budget") || null,
+    });
+    $("#edit-status").textContent = updated.ok ? "Cambios guardados." : errorText[updated.error.error];
+    if (updated.ok) void load();
+  });
+
+  const confirmInput = $<HTMLInputElement>("#delete-confirm");
+  confirmInput.addEventListener("input", () => {
+    $<HTMLButtonElement>("#delete-button").disabled =
+      confirmInput.value.trim() !== $("#panel-name").textContent;
+  });
+  $<HTMLFormElement>("#delete").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const deleted = await api.deleteEvent(token);
+    if (deleted.ok) location.href = "/";
+    else fail(deleted.error);
+  });
+
+  void load();
+</script>

@@ -1,18 +1,143 @@
 ---
-import "@/styles/starwind.css";
 import { Button } from "@/components/starwind/button";
+import { Card, CardContent } from "@/components/starwind/card";
+import { t } from "@/i18n/es";
+import Layout from "@/layouts/Layout.astro";
 ---
 
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Amigo Secreto</title>
-  </head>
-  <body class="min-h-dvh bg-background text-foreground">
-    <main class="mx-auto flex max-w-md flex-col gap-4 p-6">
-      <h1 class="text-2xl font-bold">Amigo Secreto</h1>
-      <Button>Crear evento</Button>
-    </main>
-  </body>
-</html>
+<Layout>
+  <section class="flex flex-col gap-4 pt-4">
+    <h1 class="text-3xl font-bold tracking-tight text-balance">
+      Descubre a quién le regalas, con una ruleta.
+    </h1>
+    <p class="text-muted-foreground">{t.tagline}</p>
+    <Button href="/nuevo" variant="primary" size="lg">{t.create}</Button>
+  </section>
+
+  <section id="my-events" class="flex flex-col gap-3" hidden aria-labelledby="my-events-title">
+    <h2 id="my-events-title" class="text-lg font-semibold">{t.myEvents}</h2>
+    <ul id="my-events-list" class="flex flex-col gap-2"></ul>
+  </section>
+
+  <section id="recovery" class="flex flex-col gap-3" hidden aria-labelledby="recovery-title">
+    <Card>
+      <CardContent class="flex flex-col gap-3 pt-6">
+        <h2 id="recovery-title" class="font-semibold">{t.recoveryTitle}</h2>
+        <p class="text-sm text-muted-foreground">{t.recoveryHint}</p>
+        <ul id="recovery-list" class="flex flex-col gap-4"></ul>
+      </CardContent>
+    </Card>
+  </section>
+
+  <template id="event-item">
+    <li>
+      <a
+        class="flex items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3 hover:bg-muted"
+      >
+        <span class="flex min-w-0 flex-col">
+          <span data-name class="truncate font-medium"></span>
+          <span data-detail class="text-sm text-muted-foreground"></span>
+        </span>
+        <span data-role class="shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
+        ></span>
+      </a>
+    </li>
+  </template>
+
+  <template id="recovery-item">
+    <li>
+      <form class="flex flex-col gap-2">
+        <span data-name class="font-medium"></span>
+        <div class="flex gap-2">
+          <input
+            name="password"
+            type="password"
+            required
+            autocomplete="current-password"
+            class="h-11 min-w-0 flex-1 rounded-md border bg-background px-3"
+          />
+          <button type="submit" class="h-11 rounded-md bg-primary px-4 font-medium text-primary-foreground">
+          </button>
+        </div>
+        <p data-error class="text-sm text-error" role="alert"></p>
+      </form>
+    </li>
+  </template>
+</Layout>
+
+<script>
+  import type { EventSummary, RecoveryCandidate } from "@secret-friend/contract";
+  import { errorText, t } from "@/i18n/es";
+  import { api } from "@/lib/api";
+  import { $, formatDate, show } from "@/lib/dom";
+  import { fingerprint } from "@/lib/fingerprint";
+
+  const fill = (
+    summary: EventSummary,
+    role: string,
+    href: string,
+    detail: string,
+  ): DocumentFragment => {
+    const item = $<HTMLTemplateElement>("#event-item").content.cloneNode(true) as DocumentFragment;
+    $<HTMLAnchorElement>("a", item).href = href;
+    $("[data-name]", item).textContent = summary.name;
+    $("[data-detail]", item).textContent = detail;
+    $("[data-role]", item).textContent = role;
+    return item;
+  };
+
+  const detailOf = (summary: EventSummary, extra?: string): string =>
+    [extra, summary.date ? formatDate(summary.date) : undefined].filter(Boolean).join(" · ");
+
+  const renderRecovery = (candidates: readonly RecoveryCandidate[]) => {
+    const list = $("#recovery-list");
+    for (const candidate of candidates) {
+      const item = $<HTMLTemplateElement>("#recovery-item").content.cloneNode(
+        true,
+      ) as DocumentFragment;
+      const form = $<HTMLFormElement>("form", item);
+      $("[data-name]", item).textContent = candidate.name;
+      $("button", item).textContent = t.enter;
+      $<HTMLInputElement>("input", item).setAttribute("aria-label", `${t.password}: ${candidate.name}`);
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const password = new FormData(form).get("password");
+        const result = await api.login(candidate.id, String(password), await fingerprint());
+        if (result.ok) location.href = `/admin?t=${encodeURIComponent(result.value.token)}`;
+        else $("[data-error]", form).textContent = errorText[result.error.error];
+      });
+      list.append(item);
+    }
+    show($("#recovery"), candidates.length > 0);
+  };
+
+  const mine = await api.myEvents();
+  if (mine.ok) {
+    const list = $("#my-events-list");
+    for (const summary of mine.value.created)
+      list.append(
+        fill(
+          summary,
+          t.created,
+          `/admin?t=${encodeURIComponent(summary.token)}`,
+          detailOf(summary),
+        ),
+      );
+    for (const summary of mine.value.joined)
+      list.append(
+        fill(
+          summary,
+          t.joined,
+          `/e?t=${encodeURIComponent(summary.token)}`,
+          detailOf(summary, t.asName(summary.participantName)),
+        ),
+      );
+    show($("#my-events"), list.childElementCount > 0);
+
+    if (mine.value.created.length === 0) {
+      const print = await fingerprint();
+      const candidates = print ? await api.recovery(print) : undefined;
+      if (candidates?.ok) renderRecovery(candidates.value);
+    }
+  }
+</script>

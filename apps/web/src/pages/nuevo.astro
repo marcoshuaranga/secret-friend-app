@@ -1,0 +1,263 @@
+---
+import { Button } from "@/components/starwind/button";
+import { Input } from "@/components/starwind/input";
+import { Label } from "@/components/starwind/label";
+import { t } from "@/i18n/es";
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title={t.create}>
+  <section id="form-section" class="flex flex-col gap-6">
+    <h1 class="text-2xl font-bold tracking-tight">Nuevo amigo secreto</h1>
+
+    <form id="create" class="flex flex-col gap-5" novalidate>
+      <div class="flex flex-col gap-2">
+        <Label for="name">Nombre del evento</Label>
+        <Input id="name" name="name" placeholder="Navidad en familia" maxlength={80} required />
+        <p data-error-for="name" class="text-sm text-error" role="alert"></p>
+      </div>
+
+      <fieldset class="flex flex-col gap-2">
+        <legend class="mb-2 text-sm font-medium">
+          Participantes <span id="count" class="text-muted-foreground">(0)</span>
+        </legend>
+        <div class="flex gap-2">
+          <Input
+            id="participant"
+            placeholder="Escribe un nombre y pulsa Enter"
+            maxlength={60}
+            autocomplete="off"
+            enterkeyhint="done"
+            aria-describedby="participants-hint"
+            class="min-w-0 flex-1"
+          />
+          <Button id="add" type="button" variant="secondary">Agregar</Button>
+        </div>
+        <p id="participants-hint" class="text-sm text-muted-foreground">
+          Mínimo 3. Puedes pegar varios separados por comas o saltos de línea. Incluye al
+          organizador.
+        </p>
+        <ul id="participants" class="flex flex-wrap gap-2" aria-live="polite"></ul>
+        <p data-error-for="participants" class="text-sm text-error" role="alert"></p>
+      </fieldset>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div class="flex flex-col gap-2">
+          <Label for="date">{t.date}</Label>
+          <Input id="date" name="date" type="date" />
+          <p data-error-for="date" class="text-sm text-error" role="alert"></p>
+        </div>
+        <div class="flex flex-col gap-2">
+          <Label for="budget">{t.budget}</Label>
+          <Input id="budget" name="budget" placeholder="20 USD" maxlength={40} />
+          <p data-error-for="budget" class="text-sm text-error" role="alert"></p>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <Label for="password">{t.password}</Label>
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          minlength={8}
+          autocomplete="new-password"
+          required
+          aria-describedby="password-hint"
+        />
+        <p id="password-hint" class="text-sm text-muted-foreground">
+          Mínimo 8 caracteres. Te permite administrar el evento desde otro dispositivo. Guárdala:
+          no se puede recuperar.
+        </p>
+        <p data-error-for="password" class="text-sm text-error" role="alert"></p>
+      </div>
+
+      <p id="form-error" class="text-sm text-error" role="alert"></p>
+      <Button type="submit" variant="primary" size="lg" id="submit">Crear y sortear</Button>
+    </form>
+  </section>
+
+  <section id="done" class="flex flex-col gap-5" hidden aria-live="polite">
+    <div class="flex flex-col gap-2">
+      <h1 class="text-2xl font-bold tracking-tight">¡Listo! El sorteo ya está hecho.</h1>
+      <p class="text-muted-foreground">
+        Comparte este enlace con el grupo. Cada persona elige su nombre y gira la ruleta.
+      </p>
+    </div>
+    <div class="flex flex-col gap-2 rounded-lg border bg-muted/50 p-4">
+      <code id="link" class="text-sm break-all"></code>
+      <div class="flex gap-2">
+        <Button id="copy" variant="primary" class="flex-1">{t.copy}</Button>
+        <Button id="share" variant="secondary" class="flex-1" hidden>{t.share}</Button>
+      </div>
+    </div>
+    <p class="text-sm text-muted-foreground">
+      Recuerda tu contraseña de organizador: la necesitarás si cambias de dispositivo o navegador.
+    </p>
+    <div class="flex flex-col gap-2">
+      <Button id="go-event" variant="outline">Elegir mi nombre</Button>
+      <Button id="go-admin" variant="ghost">Ir al panel del organizador</Button>
+    </div>
+  </section>
+
+  <template id="chip">
+    <li class="flex items-center gap-1 rounded-full bg-secondary py-1 pr-1 pl-3 text-sm">
+      <span data-name></span>
+      <button
+        type="button"
+        class="grid size-6 place-items-center rounded-full hover:bg-foreground/10"
+        data-remove
+      >
+        ×
+      </button>
+    </li>
+  </template>
+</Layout>
+
+<script>
+  import { createEventSchema, parseWith } from "@secret-friend/contract";
+  import { nameKey } from "@secret-friend/core";
+  import { errorText, t } from "@/i18n/es";
+  import { api } from "@/lib/api";
+  import { $, eventUrl, show } from "@/lib/dom";
+  import { fingerprint } from "@/lib/fingerprint";
+
+  const parse = parseWith(createEventSchema);
+  const form = $<HTMLFormElement>("#create");
+  const input = $<HTMLInputElement>("#participant");
+
+  let names: readonly string[] = [];
+
+  const render = () => {
+    const list = $("#participants");
+    list.replaceChildren(
+      ...names.map((name) => {
+        const chip = $<HTMLTemplateElement>("#chip").content.cloneNode(true) as DocumentFragment;
+        $("[data-name]", chip).textContent = name;
+        const remove = $<HTMLButtonElement>("[data-remove]", chip);
+        remove.setAttribute("aria-label", `Quitar a ${name}`);
+        remove.addEventListener("click", () => {
+          names = names.filter((n) => n !== name);
+          render();
+        });
+        return chip;
+      }),
+    );
+    $("#count").textContent = `(${names.length})`;
+  };
+
+  const addNames = (raw: string) => {
+    const incoming = raw
+      .split(/[,\n;]/)
+      .map((n) => n.trim().replace(/\s+/g, " "))
+      .filter(Boolean);
+    const known = new Set(names.map(nameKey));
+    const fresh = incoming.filter((n) => {
+      const key = nameKey(n);
+      if (known.has(key)) return false;
+      known.add(key);
+      return true;
+    });
+    const repeated = incoming.length - fresh.length;
+    $("[data-error-for=participants]").textContent =
+      repeated > 0 ? "Ese nombre ya está en la lista. Diferéncialo, por ejemplo «Ana R.»." : "";
+    names = [...names, ...fresh].slice(0, 50);
+    input.value = "";
+    render();
+  };
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addNames(input.value);
+    }
+  });
+  input.addEventListener("paste", (event) => {
+    const text = event.clipboardData?.getData("text") ?? "";
+    if (/[,\n;]/.test(text)) {
+      event.preventDefault();
+      addNames(text);
+    }
+  });
+  $("#add").addEventListener("click", () => {
+    addNames(input.value);
+    input.focus();
+  });
+
+  const clearErrors = () => {
+    for (const node of document.querySelectorAll("[data-error-for]")) node.textContent = "";
+    $("#form-error").textContent = "";
+  };
+
+  const showIssues = (issues: readonly { path: string; message: string }[]) => {
+    for (const issue of issues) {
+      const field = issue.path.split(".")[0] ?? "";
+      const target = document.querySelector(`[data-error-for="${field}"]`);
+      if (target && !target.textContent) target.textContent = issue.message;
+    }
+  };
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (input.value.trim()) addNames(input.value);
+    clearErrors();
+    const data = new FormData(form);
+    const optional = (key: string) => String(data.get(key) ?? "").trim() || undefined;
+    const candidate = {
+      name: String(data.get("name") ?? ""),
+      participants: names,
+      password: String(data.get("password") ?? ""),
+      ...(optional("date") ? { date: optional("date") } : {}),
+      ...(optional("budget") ? { budget: optional("budget") } : {}),
+    };
+    const parsed = parse(candidate);
+    if (!parsed.ok) {
+      showIssues(
+        parsed.error.map((i) =>
+          i.path.startsWith("participants") && names.length < 3
+            ? { ...i, message: "Agrega al menos 3 participantes." }
+            : i,
+        ),
+      );
+      return;
+    }
+    const submit = $<HTMLButtonElement>("#submit");
+    submit.disabled = true;
+    const print = await fingerprint();
+    const created = await api.createEvent({ ...parsed.value, ...(print ? { fingerprint: print } : {}) });
+    submit.disabled = false;
+    if (!created.ok) {
+      $("#form-error").textContent = errorText[created.error.error];
+      if (created.error.issues) showIssues(created.error.issues);
+      return;
+    }
+
+    const { token } = created.value;
+    const link = eventUrl(token);
+    $("#link").textContent = link;
+    const copy = $<HTMLButtonElement>("#copy");
+    copy.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(link);
+      copy.textContent = t.copied;
+      setTimeout(() => {
+        copy.textContent = t.copy;
+      }, 2000);
+    });
+    const share = $<HTMLButtonElement>("#share");
+    if ("share" in navigator) {
+      show(share);
+      share.addEventListener("click", () =>
+        navigator.share({ title: t.appName, text: t.shareText(parsed.value.name), url: link }).catch(() => {}),
+      );
+    }
+    $("#go-event").addEventListener("click", () => {
+      location.href = `/e?t=${encodeURIComponent(token)}`;
+    });
+    $("#go-admin").addEventListener("click", () => {
+      location.href = `/admin?t=${encodeURIComponent(token)}`;
+    });
+    show($("#form-section"), false);
+    show($("#done"));
+    window.scrollTo({ top: 0 });
+  });
+</script>

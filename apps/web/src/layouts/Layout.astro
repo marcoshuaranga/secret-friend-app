@@ -1,0 +1,43 @@
+---
+import "@/styles/starwind.css";
+import "@/styles/app.css";
+import { t } from "@/i18n/es";
+
+interface Props {
+  title?: string;
+}
+
+const { title } = Astro.props;
+const pageTitle = title ? `${title} · ${t.appName}` : t.appName;
+---
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content={t.tagline} />
+    <meta name="referrer" content="no-referrer" />
+    <meta property="og:title" content={t.appName} />
+    <meta property="og:description" content={t.tagline} />
+    <meta name="theme-color" content="#4f46e5" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>{pageTitle}</title>
+    <script>
+      const media = matchMedia("(prefers-color-scheme: dark)");
+      const apply = () => document.documentElement.classList.toggle("dark", media.matches);
+      apply();
+      media.addEventListener("change", apply);
+    </script>
+  </head>
+  <body class="min-h-dvh bg-background text-foreground antialiased">
+    <header class="mx-auto flex max-w-md items-center px-4 pt-5">
+      <a href="/" class="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <img src="/favicon.svg" alt="" width="28" height="28" />
+        {t.appName}
+      </a>
+    </header>
+    <main class="mx-auto flex max-w-md flex-col gap-6 px-4 pt-6 pb-16">
+      <slot />
+    </main>
+  </body>
+</html>
