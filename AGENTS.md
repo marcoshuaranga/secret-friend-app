@@ -35,6 +35,25 @@ Consecuencias de diseño:
 - **Enlace del evento**: una sola página para todos los eventos con el token en la query, p. ej. `/e?t=<token>`. No se generan páginas por evento ni se recompila al crear uno.
 - **Por qué hay servidor**: el sorteo y la privacidad lo exigen; si las asignaciones llegaran al navegador, cualquiera podría verlas. La API solo devuelve a cada participante **su propia** asignación.
 
+### Estructura del monorepo
+
+```
+apps/
+  api/   Worker con Hono, Drizzle y Typia (build con esbuild + ttsc)
+  web/   Astro estático + React (islas) + Tailwind + shadcn/ui
+packages/  código compartido (p. ej. contrato de la API, núcleo del sorteo)
+```
+
+- **pnpm workspaces** (`apps/*`, `packages/*`). Los scripts de la raíz (`build`, `typecheck`, `check`) recorren todos los paquetes.
+- **Biome** vive en la raíz y cubre todo el repo (excepto Markdown, que se edita a mano).
+
+### Versiones y toolchain
+
+- **Regla: usar las últimas versiones estables de todos los paquetes** (`pnpm up --latest -r`), salvo excepciones documentadas aquí.
+- **Node 26** (`.nvmrc`, `engines`) y **pnpm 12**.
+- pnpm 12 bloquea por defecto los scripts de instalación: solo se aprueban los necesarios en `allowBuilds` de `pnpm-workspace.yaml` (hoy, `esbuild`). Respetar también su política de antigüedad mínima de paquetes (cadena de suministro).
+- **Excepción**: `apps/web` usa **TypeScript 6** porque `astro check` aún no soporta TypeScript 7. `apps/api` usa TypeScript 7 (requerido por `ttsc`). Revisar al actualizar Astro.
+
 ## 3. Stack
 
 ### Backend

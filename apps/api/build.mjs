@@ -1,5 +1,5 @@
-import { build } from "esbuild";
 import ttsc from "@ttsc/unplugin/esbuild";
+import { build } from "esbuild";
 
 const entry = process.argv[2] ?? "src/index.ts";
 const outfile = process.argv[3] ?? "dist/index.js";
