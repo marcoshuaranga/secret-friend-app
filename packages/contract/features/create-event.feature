@@ -1,6 +1,6 @@
 # language: es
 Característica: Validación de la creación de un evento
-  Cubre RF-1: nombre y lista de participantes (3–50) con nombres únicos.
+  Cubre RF-1 (nombre y 3–50 participantes con nombres únicos) y RF-21 (contraseña del organizador).
 
   Escenario: Se acepta un evento válido
     Dado un evento llamado "Navidad oficina" con los participantes "Ana, Beto, Carla"
@@ -35,6 +35,17 @@ Característica: Validación de la creación de un evento
     Dado un evento llamado "Navidad" con los participantes "Ana, Beto, ana"
     Cuando se valida la creación
     Entonces la validación falla en "participants"
+
+  Escenario: Se rechazan nombres repetidos sin distinguir tildes
+    Dado un evento llamado "Navidad" con los participantes "Ana, Beto, Aná"
+    Cuando se valida la creación
+    Entonces la validación falla en "participants"
+
+  Escenario: Se rechaza una contraseña de organizador corta
+    Dado un evento llamado "Navidad" con los participantes "Ana, Beto, Carla"
+    Y la contraseña "1234567"
+    Cuando se valida la creación
+    Entonces la validación falla en "password"
 
   Escenario: Se rechaza un nombre de participante vacío
     Dado un evento llamado "Navidad" con los participantes "Ana, Beto,   "

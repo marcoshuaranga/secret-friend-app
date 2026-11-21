@@ -11,7 +11,13 @@ import {
 type Outcome = Result<CreateEventInput, readonly ValidationIssue[]>;
 
 interface ContractWorld {
-  input: { name: string; participants: string[]; date?: string; budget?: string };
+  input: {
+    name: string;
+    participants: string[];
+    password: string;
+    date?: string;
+    budget?: string;
+  };
   outcome?: Outcome;
 }
 
@@ -21,14 +27,18 @@ const split = (list: string): string[] => list.split(",");
 Given(
   "un evento llamado {string} con los participantes {string}",
   function (this: ContractWorld, name: string, list: string) {
-    this.input = { name, participants: split(list) };
+    this.input = { name, participants: split(list), password: "secreto123" };
   },
 );
 
 Given(
   "un evento llamado {string} con {int} participantes",
   function (this: ContractWorld, name: string, count: number) {
-    this.input = { name, participants: Array.from({ length: count }, (_, i) => `P${i + 1}`) };
+    this.input = {
+      name,
+      participants: Array.from({ length: count }, (_, i) => `P${i + 1}`),
+      password: "secreto123",
+    };
   },
 );
 
@@ -38,6 +48,10 @@ Given(
     this.input = { ...this.input, date, budget };
   },
 );
+
+Given("la contraseña {string}", function (this: ContractWorld, password: string) {
+  this.input = { ...this.input, password };
+});
 
 When("se valida la creación", function (this: ContractWorld) {
   this.outcome = parseCreateEvent(this.input);

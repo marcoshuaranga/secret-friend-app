@@ -39,7 +39,7 @@ Consecuencias de diseño:
 
 ```
 apps/
-  api/   Worker con Hono y Drizzle (build con esbuild)
+  api/   Worker con Hono y Drizzle (wrangler empaqueta desde src/index.ts)
   web/   Astro estático (todo .astro, sin frameworks de UI) + Tailwind + Starwind UI
 packages/
   core/      núcleo puro del dominio (sorteo) + escenarios Gherkin (`features/`)
@@ -48,8 +48,8 @@ packages/
 
 - `packages/core`: TypeScript puro, sin dependencias de runtime. Se ejecuta directamente con Node 26 (type stripping; imports relativos con extensión `.ts`, sin `enum` ni parameter properties). El Worker lo consumirá como dependencia del workspace.
 - `packages/contract`: única fuente de los esquemas de entrada de la API (`createEventSchema`, `claimSchema`, `eventTokenSchema`) y de sus tipos (`z.infer`). Reutiliza los límites de `core` (3–50 participantes). Expone `parseWith(schema)(entrada)`, que devuelve un `Result` en lugar de lanzar. El API valida con él en el borde y el frontend puede importar los mismos tipos.
-- `apps/api/migrations`: migraciones SQL generadas con `drizzle-kit generate`; `apps/api/wrangler.jsonc` define el Worker, los assets (`../web/dist`, con `run_worker_first` solo para `/api/*`) y el binding D1 `DB`. El `database_id` es un marcador: reemplazar al crear la base de datos.
-- Pruebas: `pnpm test` (Cucumber). Estado: sorteo (RF-11, RF-12) y validación de la creación de eventos (RF-1) cubiertos; faltan escenarios de la API y de la UI.
+- `apps/api/migrations`: migraciones SQL generadas con `drizzle-kit generate`; `apps/api/wrangler.jsonc` define el Worker, los assets (`../web/dist`, con `run_worker_first` solo para `/api/*`) y el binding D1 `DB`. El `database_id` es un marcador que el workflow de despliegue reemplaza. Un Cron Trigger diario ejecuta la limpieza. `pnpm --filter @secret-friend/api dev` levanta todo en local (antes: `pnpm build` y `db:migrate:local`).
+- Pruebas: `pnpm test` (Cucumber). Núcleo, contrato y API cubiertos. Las pruebas de la API usan `app.request()` contra un D1 local de `getPlatformProxy()` de wrangler (`apps/api/features/support/world.ts`); cada nombre de dispositivo en los escenarios es un tarro de cookies distinto.
 
 - **pnpm workspaces** (`apps/*`, `packages/*`). Los scripts de la raíz (`build`, `typecheck`, `check`) recorren todos los paquetes.
 - **Biome** vive en la raíz y cubre todo el repo (excepto Markdown, que se edita a mano).
@@ -58,7 +58,7 @@ packages/
 
 - **Regla: usar las últimas versiones estables de todos los paquetes** (`pnpm up --latest -r`), salvo excepciones documentadas aquí.
 - **Node 26** (`.nvmrc`, `engines`) y **pnpm 12**.
-- pnpm 12 bloquea por defecto los scripts de instalación: solo se aprueban los necesarios en `allowBuilds` de `pnpm-workspace.yaml` (hoy, `esbuild`). Respetar también su política de antigüedad mínima de paquetes (cadena de suministro).
+- pnpm 12 bloquea por defecto los scripts de instalación: solo se aprueban los necesarios en `allowBuilds` de `pnpm-workspace.yaml` (hoy, `esbuild` y `workerd`). Respetar también su política de antigüedad mínima de paquetes (cadena de suministro).
 - **Excepción**: `apps/web` desactiva `exactOptionalPropertyTypes` porque el código generado por Starwind no lo cumple; el resto de `strictest` sigue activo. El código vendorizado de Starwind (`src/components/starwind`, `starwind.css`) se excluye de Biome.
 - **Excepción**: `apps/web` usa **TypeScript 6** porque `astro check` aún no soporta TypeScript 7. `apps/api`, `packages/core` y `packages/contract` usan TypeScript 7. Revisar al actualizar Astro.
 
@@ -67,7 +67,7 @@ packages/
 ### Backend
 - TypeScript en modo `strict` (con `noUncheckedIndexedAccess` y `exactOptionalPropertyTypes`).
 - **Hono** (rutas), **Drizzle** (ORM sobre D1), **Zod Mini** (validación y tipos en runtime).
-- **esbuild** para empaquetar el Worker.
+- **wrangler** empaqueta el Worker; `pnpm build` ejecuta `wrangler deploy --dry-run` para validar el paquete sin desplegar. Los imports usan extensión `.ts` para que las pruebas corran con Node sin compilar.
 - **Biome** para lint y formato.
 - **Validación: solo `zod/mini`** (API funcional y tree-shakable, bundle pequeño para el Worker y el navegador). Se usa `import * as z from "zod/mini"` y `z.safeParse(schema, dato)`; los límites se expresan con `.check(z.minLength(…), z.maxLength(…), z.regex(…), z.refine(…))` y los opcionales con `z.optional(…)`. **Prohibido** importar `zod`, `zod/v4` o `zod/v3`: Biome lo bloquea con `noRestrictedImports`. Los esquemas viven únicamente en `packages/contract`.
 

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e6109adc-dc4d-4a5c-b433-125b36b9bd7c",
+  "id": "67193c3b-27b0-42a5-8d80-cf39e84e981f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "assignments": {
@@ -68,6 +68,109 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "devices": {
+      "name": "devices",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "devices_token_hash_unique": {
+          "name": "devices_token_hash_unique",
+          "columns": ["token_hash"],
+          "isUnique": true
+        },
+        "devices_fingerprint_idx": {
+          "name": "devices_fingerprint_idx",
+          "columns": ["fingerprint"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "event_admins": {
+      "name": "event_admins",
+      "columns": {
+        "event_id": {
+          "name": "event_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "event_admins_device_idx": {
+          "name": "event_admins_device_idx",
+          "columns": ["device_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "event_admins_event_id_events_id_fk": {
+          "name": "event_admins_event_id_events_id_fk",
+          "tableFrom": "event_admins",
+          "tableTo": "events",
+          "columnsFrom": ["event_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "event_admins_device_id_devices_id_fk": {
+          "name": "event_admins_device_id_devices_id_fk",
+          "tableFrom": "event_admins",
+          "tableTo": "devices",
+          "columnsFrom": ["device_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "event_admins_event_id_device_id_pk": {
+          "columns": ["event_id", "device_id"],
+          "name": "event_admins_event_id_device_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "events": {
       "name": "events",
       "columns": {
@@ -80,13 +183,6 @@
         },
         "token": {
           "name": "token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "admin_token_hash": {
-          "name": "admin_token_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -109,6 +205,35 @@
         "budget": {
           "name": "budget",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "admin_password_hash": {
+          "name": "admin_password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "admin_password_salt": {
+          "name": "admin_password_salt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "failed_logins": {
+          "name": "failed_logins",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "login_window_start": {
+          "name": "login_window_start",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -164,6 +289,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "claimed_at": {
           "name": "claimed_at",
           "type": "integer",
@@ -171,9 +303,9 @@
           "notNull": false,
           "autoincrement": false
         },
-        "claim_token_hash": {
-          "name": "claim_token_hash",
-          "type": "text",
+        "revealed_at": {
+          "name": "revealed_at",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -183,6 +315,11 @@
         "participants_event_name_unique": {
           "name": "participants_event_name_unique",
           "columns": ["event_id", "name"],
+          "isUnique": true
+        },
+        "participants_device_event_unique": {
+          "name": "participants_device_event_unique",
+          "columns": ["device_id", "event_id"],
           "isUnique": true
         }
       },
@@ -194,6 +331,15 @@
           "columnsFrom": ["event_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "participants_device_id_devices_id_fk": {
+          "name": "participants_device_id_devices_id_fk",
+          "tableFrom": "participants",
+          "tableTo": "devices",
+          "columnsFrom": ["device_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },

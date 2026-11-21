@@ -22,7 +22,7 @@ Amigo secreto web *mobile first*. Un enlace por evento; cada persona elige su no
 | Despliegue | Un único Worker con Static Assets: sirve el sitio Astro estático y la API Hono bajo `/api/*` |
 | Base de datos | D1 (SQLite) con Drizzle ORM |
 | Frontend | Astro estático, **sin SSR**, **sin islas ni frameworks de UI**; Tailwind 4 + **Starwind UI**; interactividad con `<script>` TS y custom elements |
-| Backend | TypeScript estricto, Hono, Drizzle, **Zod Mini** (`zod/mini`, único punto de entrada permitido), esbuild, Biome; estilo funcional (composición, inmutabilidad, currying, fail fast) |
+| Backend | TypeScript estricto, Hono, Drizzle, **Zod Mini** (`zod/mini`, único punto de entrada permitido), wrangler, Biome; estilo funcional (composición, inmutabilidad, currying, fail fast) |
 | Pruebas | BDD con Cucumber/Gherkin (en español) |
 | Toolchain | Node 26, pnpm 12, últimas versiones de todo salvo excepciones de `AGENTS.md` |
 | Flujo | Trunk-based; ejecutar `pnpm verify` antes de cada push |
@@ -33,7 +33,7 @@ Todas las decisiones de producto están confirmadas; el resumen está en `PLAN.m
 ## 4. Qué hay construido
 
 ```
-apps/api/        Worker Hono (solo GET /api/health), esquema Drizzle, migración 0000_init.sql, wrangler.jsonc, build esbuild
+apps/api/        Worker Hono con toda la API de PLAN.md §2, esquema Drizzle, migración 0000_init.sql, wrangler.jsonc
 apps/web/        Astro 7 estático con Starwind UI (button, input, label, card) y una página de inicio mínima
 packages/core/   Sorteo sin puntos fijos (derangement) + 9 escenarios Gherkin (36 pasos) pasando
 packages/contract/  Esquemas Zod Mini de la API (crear evento, reclamar, token) + `parseWith` + 11 escenarios Gherkin (RF-1) pasando
@@ -60,7 +60,7 @@ Si la sesión nueva no tiene `/opt/node26`, instalar Node 26 (LTS) desde nodejs.
 1. **Validación con Zod Mini**: solo `zod/mini`. Biome bloquea `zod`, `zod/v4` y `zod/v3` (`noRestrictedImports` en `biome.json`). Los esquemas viven en `packages/contract`. En `zod/mini` los límites van en `.check(z.minLength(..), z.trim(), ...)`, no como métodos encadenados.
 2. **TypeScript**: `apps/api`, `core` y `contract` usan TS 7; `apps/web` usa **TS 6** porque `astro check` no soporta TS 7.
 3. **Starwind**: su código no cumple `exactOptionalPropertyTypes`, por eso `apps/web` lo desactiva; y su código vendorizado está excluido de Biome. Biome tiene falsos positivos de "import sin usar" en `.astro` (desactivados solo para esos archivos).
-4. **pnpm 12** bloquea scripts de instalación: solo `esbuild` está aprobado en `allowBuilds`. pnpm añadió solo una excepción de antigüedad mínima para `@cloudflare/workers-types` (publicado el mismo día); es solo tipos, riesgo bajo.
+4. **pnpm 12** bloquea scripts de instalación: solo `esbuild` y `workerd` están aprobados en `allowBuilds`. pnpm añadió solo una excepción de antigüedad mínima para `@cloudflare/workers-types` (publicado el mismo día); es solo tipos, riesgo bajo.
 5. **Biome no formatea Markdown** (excluido a propósito para no reescribir los documentos).
 6. **Cuidado al encadenar comandos con `| tail`**: oculta el código de salida y puede dejar pasar errores de Biome. Usar `pnpm verify` y mirar su código de salida.
 7. La plantilla oficial de Astro y otras descargas de GitHub pueden fallar por la red; el proyecto web se creó a mano.

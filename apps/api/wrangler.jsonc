@@ -1,8 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "secret-friend",
-  "main": "dist/index.js",
+  "main": "src/index.ts",
   "compatibility_date": "2026-11-21",
+  "workers_dev": true,
+  "send_metrics": false,
   "assets": {
     "directory": "../web/dist",
     "not_found_handling": "404-page",
@@ -12,8 +14,12 @@
     {
       "binding": "DB",
       "database_name": "secret-friend",
-      "database_id": "REEMPLAZAR_AL_CREAR_LA_BASE_DE_DATOS",
+      // El workflow de despliegue lo reemplaza con la variable D1_DATABASE_ID de GitHub.
+      "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  // Limpieza diaria de eventos vencidos y dispositivos sin eventos (04:17 UTC).
+  "triggers": { "crons": ["17 4 * * *"] },
+  "observability": { "enabled": true }
 }
