@@ -30,10 +30,10 @@ Limitación aceptada: si la persona abre el enlace en otro navegador (por ejempl
 
 | # | Tarea | Listo cuando |
 |---|---|---|
-| 0.1 | Conectar `@secret-friend/core` como dependencia de workspace de `apps/api` | La API importa `draw` y el build lo empaqueta |
+| 0.1 | Conectar `@secret-friend/core` y `@secret-friend/contract` como dependencias de workspace de `apps/api` | La API importa `draw` y `parseWith` y el build los empaqueta |
 | 0.2 | Instalar `wrangler` en `apps/api` y añadir los scripts `dev` (`wrangler dev`) y `db:migrate:local` | `pnpm --filter api dev` levanta el Worker con D1 local y sirve `apps/web/dist` |
-| 0.3 | CI en GitHub Actions: `pnpm verify` en cada push a `main`, con caché de pnpm y de `.ttsc/` y la toolchain de Go | El primer push muestra el check en verde |
-| 0.4 | Infraestructura de pruebas de la API: Cucumber ejecutando la app Hono con `app.request()` y un D1 local de `getPlatformProxy()` de wrangler, cargado con `ttsx` para que Typia se transforme | Un escenario de `GET /api/health` pasa |
+| 0.3 | ~~CI en GitHub Actions~~ **Hecho** (`.github/workflows/ci.yml`) | Confirmar que la última ejecución está en verde |
+| 0.4 | Infraestructura de pruebas de la API: Cucumber ejecutando la app Hono con `app.request()` y un D1 local de `getPlatformProxy()` de wrangler | Un escenario de `GET /api/health` pasa |
 
 ## Fase 1 — Dominio puro (`packages/core`)
 
@@ -41,7 +41,7 @@ Todo lo que es regla del negocio, sin E/S, probado con escenarios Gherkin y con 
 
 | # | Tarea | RF |
 |---|---|---|
-| 1.1 | Normalizar y validar la entrada del evento: recortar espacios, nombres de 1–40 caracteres, únicos sin distinguir mayúsculas ni tildes ("Ana" = "ana" = "Aná"), 3–50 participantes, nombre del evento obligatorio, fecha y presupuesto opcionales | RF-1 |
+| 1.1 | Validación de entrada: ya existe en `@secret-friend/contract` (recorte, largos, 3–50, únicos sin distinguir mayúsculas). Falta: que la unicidad ignore también tildes ("Ana" = "Aná"), añadir los esquemas de las rutas de administración y que la UI reutilice los mismos esquemas | RF-1 |
 | 1.2 | Ya existe: sorteo sin puntos fijos, uniforme | RF-11, RF-12 |
 | 1.3 | Reglas de reclamo como funciones puras: libre → tomado, tomado por mí → idempotente, tomado por otro → error `NAME_TAKEN` | RF-4, RF-5 |
 | 1.4 | Vencimiento: `expiresAt = createdAt + 90 días`; un evento vencido equivale a inexistente | PRD §6 |
@@ -49,7 +49,7 @@ Todo lo que es regla del negocio, sin E/S, probado con escenarios Gherkin y con 
 
 ## Fase 2 — API (`apps/api`)
 
-Rutas Hono finas: validan con Typia en el borde, llaman al núcleo y a un repositorio con currying (`crearRepo(db)`), y traducen los errores `Result` a HTTP. Tokens de 256 bits en base64url; en D1 solo sus hashes SHA-256.
+Rutas Hono finas: validan en el borde con los esquemas Zod Mini de `@secret-friend/contract` (`parseWith`), llaman al núcleo y a un repositorio con currying (`crearRepo(db)`), y traducen los errores `Result` a HTTP. Tokens de 256 bits en base64url; en D1 solo sus hashes SHA-256.
 
 ### Cambios de esquema (migración `0001`)
 
@@ -69,7 +69,7 @@ Rutas Hono finas: validan con Typia en el borde, llaman al núcleo y a un reposi
 | PATCH | `/api/events/:token` | admin | Edita nombre, fecha y presupuesto. Los participantes no se editan: cambiarlos rompería el sorteo | Admin |
 | DELETE | `/api/events/:token` | admin | Borra el evento y todo en cascada | Admin |
 
-Respuestas de error uniformes `{ error: "<CODIGO>" }`: `INVALID_INPUT`, `NOT_FOUND` (también si venció), `NAME_TAKEN`, `NOT_CLAIMED`, `UNAUTHORIZED`. Comparaciones de hashes en tiempo constante. `Cache-Control: no-store` en todo `/api/*`.
+Respuestas de error uniformes `{ error: "<CODIGO>" }` (con `issues: [{ path, message }]` de `parseWith` cuando es `INVALID_INPUT`): `INVALID_INPUT`, `NOT_FOUND` (también si venció), `NAME_TAKEN`, `NOT_CLAIMED`, `UNAUTHORIZED`. Comparaciones de hashes en tiempo constante. `Cache-Control: no-store` en todo `/api/*`.
 
 ### Escenarios Gherkin de la API
 
@@ -130,7 +130,6 @@ Custom element `<sf-roulette>` con la secuencia de la fase 1.5. Sin dependencias
 | Alguien elige un nombre que no es el suyo | Confirmación "¿Eres Ana?" y liberación desde el panel |
 | Se pierde la identidad del dispositivo (otro navegador, datos borrados) | Mensaje claro y liberación por el organizador |
 | El organizador pierde el enlace de administración | Se guarda también en `localStorage` del dispositivo creador; se advierte al crearlo. Sin cuentas no hay recuperación posible |
-| La primera compilación de `ttsc` en CI es lenta | Caché de `.ttsc/` entre ejecuciones |
 | Superar límites del plan gratuito | Estáticos fuera del Worker, pocas escrituras por evento (unas 2 + 4 por participante, contando índices), CPU baja por SHA-256 |
 
 ## Fuera de v1
