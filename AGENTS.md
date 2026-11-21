@@ -140,7 +140,7 @@ Errores como `{ error: "<CODIGO>" }`: `INVALID_INPUT` (con `issues: [{ path, mes
 
 - Permutación sin puntos fijos (*derangement*), uniforme sobre las válidas, generada una sola vez al crear el evento e inmutable.
 - Función pura que recibe la lista y una fuente de aleatoriedad inyectada, para poder probarla con semillas fijas.
-- La ruleta se puede girar sin límite (RF-14). La secuencia de nombres que pasa por el carrete la genera una función pura del núcleo a partir del resultado y una semilla; la UI solo anima. El resultado se pide al servidor una vez y se reutiliza en cada giro.
+- La ruleta se gira una sola vez (RF-14). El servidor es la fuente de verdad: `revealed_at` se marca al pedir el resultado y, si ya existe, la UI muestra el resultado sin ruleta. La secuencia de nombres del carrete la genera una función pura del núcleo a partir del resultado y una semilla; la UI solo anima.
 
 ## 8. Skills y herramientas
 

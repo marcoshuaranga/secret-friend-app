@@ -35,7 +35,7 @@ Aplicación web *mobile first* para organizar un amigo secreto entre un grupo de
 4. **Elegir nombre** (participante): al abrir el enlace ve la lista de nombres y toca el suyo. Esto lo identifica en ese dispositivo y lo excluye de ser su propio amigo secreto.
 5. **Ruleta**: pantalla con una ruleta/carrusel vertical de nombres, con puesta en escena de casino. El usuario hace **swipe hacia abajo** y la ruleta gira rápido, desacelera y se detiene en su amigo secreto.
 6. **Revelación**: aparece el nombre resaltado con **confeti** y animación. Se muestra el recordatorio de fecha y presupuesto si existen.
-7. **Revisitar**: si vuelve a abrir el enlace en el mismo dispositivo, ve directamente su resultado y puede volver a girar la ruleta las veces que quiera; siempre cae en el mismo nombre.
+7. **Revisitar**: si vuelve a abrir el enlace en el mismo dispositivo, ve directamente su resultado, sin ruleta: la ruleta se gira una sola vez.
 8. **Administrar** (organizador): desde "Mis eventos" en su dispositivo (o con su contraseña en otro) ve quién ya eligió nombre y quién ya vio su resultado, libera nombres elegidos por error y edita o elimina el evento.
 
 ## 5. Requisitos funcionales
@@ -55,7 +55,7 @@ Aplicación web *mobile first* para organizar un amigo secreto entre un grupo de
 - RF-8: La ruleta muestra los nombres de los demás participantes (nunca el propio) girando con inercia y desaceleración, y se detiene en el resultado real.
 - RF-9: El resultado está definido desde la creación del evento; la ruleta es puramente visual y nunca lo decide.
 - RF-10: Al terminar: confeti, vibración corta en móvil (si está disponible) y nombre destacado.
-- RF-14: La ruleta se puede girar **todas las veces que se quiera**; cada giro termina en el mismo resultado.
+- RF-14: La ruleta se gira **una sola vez** por participante. Después, en cualquier visita, solo se muestra el resultado. Si el organizador libera el nombre, quien lo vuelva a elegir gira de nuevo.
 - RF-15: Estilo **casino** en la pantalla de la ruleta: palanca de tragamonedas (el swipe), luces de marquesina, nombres que pasan casi deteniéndose antes del real, sonido opcional (apagado por defecto). El resto de la app tiene un estilo neutro y moderno.
 
 ### 5.4 Sorteo
@@ -92,7 +92,7 @@ Aplicación web *mobile first* para organizar un amigo secreto entre un grupo de
 3. **Evento creado**: enlace para copiar/compartir.
 4. **Elegir nombre**: lista tocable con estados (libre / tomado).
 5. **Ruleta**: zona de swipe con indicación visual ("desliza hacia abajo").
-6. **Resultado**: nombre, confeti, fecha y presupuesto, y botón para volver a girar.
+6. **Resultado**: nombre, confeti (solo tras el giro), fecha y presupuesto.
 7. **Panel del organizador**: estado de los participantes y acciones de administración.
 8. **Errores**: enlace inválido/expirado, nombre ya tomado por otro dispositivo.
 
@@ -125,6 +125,6 @@ Ninguna por ahora.
 
 - Exclusiones de parejas: v2.
 - Panel del organizador: sí (RF-16 a RF-19).
-- Volver a girar la ruleta: sí, ilimitado y con estilo casino (RF-14, RF-15).
+- Ruleta: se gira una sola vez, con estilo casino (RF-14, RF-15).
 - Identidad: el dispositivo es la sesión (RF-6), con "Mis eventos" y recuperación del organizador por contraseña (RF-20 a RF-22).
 - Vencimiento a 90 días, textos preparados para i18n: confirmados.

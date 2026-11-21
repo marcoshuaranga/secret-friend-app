@@ -72,7 +72,7 @@ El plan completo de v1, por fases y con criterios de terminado, está en [`PLAN.
 
 ## 8. Decisiones del 2026-11-21
 
-No quedan preguntas abiertas. Resumen en `PLAN.md` ("Decisiones cerradas"): panel del organizador, ruleta repetible estilo casino, estilo neutro y moderno, identidad híbrida (ID aleatorio del dispositivo + *fingerprint* solo como pista + contraseña del organizador), 90 días, i18n preparada, Playwright, despliegue manual con GitHub Actions, exclusiones en v2.
+No quedan preguntas abiertas. Resumen en `PLAN.md` ("Decisiones cerradas"): panel del organizador, ruleta de un solo giro estilo casino, estilo neutro y moderno, identidad híbrida (ID aleatorio del dispositivo + *fingerprint* solo como pista + contraseña del organizador), 90 días, i18n preparada, Playwright, despliegue manual con GitHub Actions, exclusiones en v2.
 
 ## 9. Notas sobre cómo trabaja el usuario
 

@@ -11,7 +11,7 @@ No quedan preguntas abiertas. Cualquier cambio sobre esto se registra primero en
 | Tema | Decisión |
 |---|---|
 | Administración | El organizador tiene un panel: estado de cada participante (nunca asignaciones), liberar nombres, editar y eliminar el evento |
-| Ruleta | Se gira sin límite, siempre cae en el mismo resultado; puesta en escena de casino **solo en la pantalla de la ruleta** |
+| Ruleta | Se gira **una sola vez** (lo controla el servidor con `revealed_at`); después solo se muestra el resultado; puesta en escena de casino **solo en la pantalla de la ruleta** |
 | Estilo visual | **Neutro y moderno** en el resto de la app: claro, minimalista, acentos de color, modo oscuro |
 | Identidad | **Híbrida**: ID aleatorio del dispositivo como "cuenta" + *fingerprint* del navegador solo como pista de recuperación (detalle abajo) |
 | Recuperar la administración | Contraseña del organizador, definida al crear el evento |
@@ -36,7 +36,7 @@ No quedan preguntas abiertas. Cualquier cambio sobre esto se registra primero en
 
 **Participantes que pierden su identidad**: el nombre sigue tomado; el organizador lo libera desde el panel y la persona lo vuelve a elegir. El *fingerprint* no se usa para recuperar participantes, porque una coincidencia por error le mostraría a alguien el resultado de otro.
 
-**Datos que viajan a la interfaz**: `localStorage` solo guarda conveniencias (sonido activado, si ya giré en este evento). La identidad vive en la cookie, que el JavaScript no puede leer.
+**Datos que viajan a la interfaz**: `localStorage` solo guarda conveniencias (sonido activado). La identidad vive en la cookie, que el JavaScript no puede leer.
 
 ## Fase 0 — Fundaciones
 
@@ -80,7 +80,7 @@ Escrituras al crear un evento de *n* personas: unas 4 + 5·*n* contando índices
 | Método | Ruta | Auth | Función | RF |
 |---|---|---|---|---|
 | POST | `/api/events` | dispositivo (se crea) | Valida, sortea y guarda en un `batch`; el dispositivo queda como admin. Devuelve `token` | RF-1, RF-2, RF-13, RF-16 |
-| GET | `/api/events/:token` | — | Nombre, fecha, presupuesto, participantes (`id`, `name`, `taken`); `me` e `isAdmin` según la cookie | RF-4, RF-5 |
+| GET | `/api/events/:token` | — | Nombre, fecha, presupuesto, participantes (`id`, `name`, `taken`); `me` (`participantId`, `revealed`) e `isAdmin` según la cookie | RF-4, RF-5, RF-14 |
 | POST | `/api/events/:token/claim` | dispositivo (se crea) | `{ participantId }`. 409 `NAME_TAKEN` / `ALREADY_CLAIMED` | RF-4, RF-5, RF-6 |
 | GET | `/api/events/:token/result` | dispositivo | Solo el nombre de mi amigo secreto; la primera vez marca `revealed_at` | RF-8, RF-9 |
 | GET | `/api/me/events` | dispositivo | "Mis eventos": creados y unidos, con su enlace | RF-20 |
@@ -117,8 +117,8 @@ Custom element `<sf-roulette>` con la secuencia de la fase 1.6. Única dependenc
 - **Gesto**: arrastrar hacia abajo como la palanca de una tragamonedas; la fuerza del swipe fija la velocidad inicial. Botón "Girar" equivalente (RF-7).
 - **Movimiento**: carrete vertical con `transform` y `requestAnimationFrame`, frenado progresivo, "casi aciertos" y rebote final.
 - **Puesta en escena** (solo en esta pantalla): luces de marquesina, tic sonoro por nombre (Web Audio, **apagado por defecto**), vibración corta, confeti y nombre destacado (RF-10, RF-15).
-- **Repetir**: "Girar otra vez" ilimitado; el resultado se pide al servidor una vez y se reutiliza (RF-14).
-- **Revisitar**: si ya giré, se muestra el resultado con el botón para volver a girar.
+- **Una sola vez** (RF-14): el resultado se pide al servidor al girar. `GET /api/events/:token` indica `revealed` en `me`; si ya está, la página no muestra la ruleta. No hay botón para volver a girar.
+- **Revisitar**: si ya giré (en este u otro momento), se muestra directo el resultado, sin animación ni confeti.
 - **Movimiento reducido**: sin carrete largo ni confeti; transición corta al resultado.
 - Resultado con fecha, presupuesto y "Agregar al calendario" (`.ics` generado en el navegador).
 
@@ -140,7 +140,7 @@ Custom element `<sf-roulette>` con la secuencia de la fase 1.6. Única dependenc
 
 ## Fase 7 — Calidad y cierre de v1
 
-- Escenarios de UI con Playwright: crear, compartir, elegir nombre en dos contextos de navegador, girar varias veces, revisitar, liberar desde el panel, recuperar la administración con contraseña.
+- Escenarios de UI con Playwright: crear, compartir, elegir nombre en dos contextos de navegador, girar una vez, revisitar y comprobar que la ruleta ya no aparece, liberar desde el panel, recuperar la administración con contraseña.
 - Accesibilidad: foco visible, etiquetas, contraste, resultado anunciado con `aria-live`.
 - Rendimiento: < 2 s en 4G simulado, JS por página < 30 KB comprimido.
 - Prueba real con un grupo de amigos.
