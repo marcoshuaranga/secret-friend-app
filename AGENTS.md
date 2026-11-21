@@ -120,5 +120,11 @@ Tokens: aleatorios criptográficamente, largos, inadivinables; en base de datos 
 
 ## 9. Flujo de trabajo
 
-- Desarrollar en la rama indicada por la sesión; no crear PR sin pedirlo explícitamente.
-- Commits pequeños y descriptivos; cambios funcionales se reflejan primero en `PRD.md` y cambios técnicos aquí.
+**Trunk-based development**: `main` es la única rama de trabajo y la rama por defecto del repositorio.
+
+- Todos los cambios van **directamente a `main`**. No se crean ramas de funcionalidad ni PR salvo petición explícita.
+- Commits pequeños y frecuentes, cada uno coherente y desplegable por sí solo.
+- **`main` siempre debe estar en verde**: antes de cada push, ejecutar `pnpm verify` (Biome, typecheck, pruebas BDD y build). Si falla, se corrige antes de subir; no se sube código roto.
+- Para trabajo incompleto visible al usuario, usar interruptores de funcionalidad o dejar el código sin enlazar, en lugar de ramas de larga vida.
+- Los cambios funcionales se reflejan primero en `PRD.md` y los técnicos en este archivo, en el mismo commit que el código.
+- Mensajes de commit descriptivos, en imperativo.

@@ -9,7 +9,8 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r --if-present test",
-    "check": "biome check ."
+    "check": "biome check .",
+    "verify": "pnpm check && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.8"
