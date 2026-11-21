@@ -42,7 +42,7 @@ Consecuencias de diseño:
 - **Hono** (rutas), **Drizzle** (ORM sobre D1), **Typia** (validación y tipos en runtime).
 - **esbuild** para empaquetar el Worker.
 - **Biome** para lint y formato.
-- **[Riesgo]** Typia requiere un transformador de TypeScript y esbuild no los ejecuta; se usará un plugin (p. ej. `unplugin-typia`). Validar primero en el scaffold; si falla, replantear empaquetador o librería de validación.
+- **Typia 15 + esbuild (validado)**: Typia 15 ya no usa plugins de bundler propios; requiere `ttsc` (compilador basado en TypeScript-Go) y `@ttsc/unplugin/esbuild` en el build. `unplugin-typia` no es compatible. La primera compilación genera un binario en Go (tarda varios minutos y necesita la toolchain de Go y red); las siguientes tardan ~2 s. Hay que usar `ttsc`/`ttsx`, no `tsc`/`tsx`, para cualquier paso que ejecute el transformador.
 
 ### Frontend
 - **Astro** (estático), **Tailwind**, **shadcn/ui** como sistema de UI.
