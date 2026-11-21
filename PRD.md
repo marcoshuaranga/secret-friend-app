@@ -1,6 +1,6 @@
 # PRD — Secret Friend (Amigo Secreto)
 
-> Estado: borrador v0.3 · Los puntos marcados con **[Supuesto]** no fueron confirmados y deben validarse antes de implementar.
+> Estado: borrador v0.4 · Los puntos marcados con **[Supuesto]** no fueron confirmados y deben validarse antes de implementar.
 
 ## 1. Resumen
 
@@ -76,7 +76,7 @@ Es un proyecto por diversión entre amigos. Toda la infraestructura debe caber e
 ### 7.2 Decisiones confirmadas
 - **Infraestructura**: **Cloudflare**, plan gratuito.
 - **Componentes**: **un único Worker con Static Assets** (sirve el sitio Astro estático y la API Hono) + **D1** como base de datos. Esto resuelve §7.3: la API vive en el mismo Worker (equivale a la opción A, sin Pages Functions).
-- **Frontend**: Astro con **salida estática** (`output: 'static'`), islas interactivas solo para la ruleta y la selección de nombre. SSR queda **pendiente de decidir** (ver §12); por defecto, estático.
+- **Frontend**: Astro con **salida estática** (`output: 'static'`), islas interactivas solo para la ruleta y la selección de nombre. **Decisión: todo estático + API, sin SSR.** Consecuencia aceptada: la página del evento es un cascarón que carga sus datos desde la API, y la vista previa al compartir el enlace será genérica (igual para todos los eventos).
 - **Base de datos**: **SQLite sobre D1** con **Drizzle ORM** (ver §7.4).
 - **Stack detallado**: ver §7.7.
 
@@ -97,7 +97,7 @@ Las opciones A y B no cambian el frontend, así que se puede decidir durante el 
 | **Cloudflare D1** | Incluido en el plan gratuito de Workers. | Nativo (binding directo, sin credenciales externas). Drizzle tiene driver `d1`. |
 | **Turso** | Plan gratuito con límites generosos. | Driver `libsql` de Drizzle; requiere token como secreto. |
 
-**[Supuesto] Recomendación:** D1, porque mantiene todo en una sola cuenta y no necesita credenciales externas. Turso queda como alternativa si se quiere portabilidad fuera de Cloudflare. Con Drizzle, el cambio entre ambos afecta casi solo la configuración del cliente.
+**Decisión: D1**, porque mantiene todo en una sola cuenta y no necesita credenciales externas. Turso queda como alternativa si se quiere portabilidad fuera de Cloudflare. Con Drizzle, el cambio entre ambos afecta casi solo la configuración del cliente.
 
 ### 7.5 Esquema mínimo
 - `events(id, token, admin_token_hash, name, date, budget, created_at, expires_at)`
@@ -170,6 +170,4 @@ Las opciones A y B no cambian el frontend, así que se puede decidir durante el 
 
 1. ¿El organizador necesita un panel para ver quién ya reveló (sin ver asignaciones) y liberar nombres?
 2. ¿Se permiten exclusiones (parejas que no se pueden tocar) en v1?
-3. ¿Se confirma D1 como base de datos? (en el stack se escribió "R1"; se asume D1, ya que R2 es almacenamiento de objetos y no se necesita).
-4. ¿SSR solo en `/e/[token]` para la vista previa al compartir, o todo estático? (§7.2)
-5. ¿Se permite volver a girar la ruleta o solo una vez? (Propuesta: una vez, luego solo se muestra el resultado.)
+3. ¿Se permite volver a girar la ruleta o solo una vez? (Propuesta: una vez, luego solo se muestra el resultado.)
