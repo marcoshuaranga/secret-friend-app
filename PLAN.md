@@ -2,6 +2,8 @@
 
 Plan de construcción de la aplicación completa. El **qué** está en [`PRD.md`](./PRD.md) y el **cómo** en [`AGENTS.md`](./AGENTS.md); este archivo ordena el trabajo en fases y define cuándo cada una está terminada.
 
+> **Estado (2026-11-21): fases 0 a 7 implementadas y en verde** (`pnpm verify`, `pnpm test:e2e` y CI). Pendiente solo lo que requiere al usuario: 6.1, lanzar 6.3 y la prueba real con amigos (fase 7).
+>
 > Todo se trabaja en `main` (trunk-based). Cada tarea termina con `pnpm verify` en verde y un commit pequeño. Las fases se entregan en orden porque cada una se apoya en la anterior. Dentro de una fase, primero el escenario Gherkin y después el código.
 
 ## Decisiones cerradas (2026-11-21)
@@ -136,14 +138,16 @@ Custom element `<sf-roulette>` con la secuencia de la fase 1.6. Única dependenc
 | 6.2 | Workflow manual `.github/workflows/deploy.yml` (`workflow_dispatch`): `pnpm verify`, sustituye `database_id`, `wrangler d1 migrations apply DB --remote`, `wrangler deploy` | Agente |
 | 6.3 | Primer despliegue y comprobación de que solo `/api/*` despierta al Worker | Usuario lanza, agente verifica |
 | 6.4 | Cron Trigger diario: borra eventos vencidos y dispositivos sin eventos | Agente |
-| 6.5 | `_headers` para los estáticos: CSP sin scripts externos, `Referrer-Policy: no-referrer`, `X-Content-Type-Options` | Agente |
+| 6.5 | `_headers` para los estáticos (`Referrer-Policy: no-referrer`, `X-Content-Type-Options`, `X-Frame-Options`) y CSP con hashes generada por Astro (`security.csp`) | Agente |
 
 ## Fase 7 — Calidad y cierre de v1
 
 - Escenarios de UI con Playwright: crear, compartir, elegir nombre en dos contextos de navegador, girar una vez, revisitar y comprobar que la ruleta ya no aparece, liberar desde el panel, recuperar la administración con contraseña.
 - Accesibilidad: foco visible, etiquetas, contraste, resultado anunciado con `aria-live`.
 - Rendimiento: < 2 s en 4G simulado, JS por página < 30 KB comprimido.
-- Prueba real con un grupo de amigos.
+- Prueba real con un grupo de amigos (usuario).
+
+Resultados medidos en local: carga < 0,8 s en 4G simulado (150 ms RTT, 1,6 Mbps); ~20 KB de JS comprimido en todo el sitio; sin controles sin nombre accesible; modo oscuro y movimiento reducido revisados con capturas.
 
 ## Riesgos
 

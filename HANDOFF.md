@@ -32,16 +32,19 @@ Todas las decisiones de producto están confirmadas; el resumen está en `PLAN.m
 
 ## 4. Qué hay construido
 
+La v1 completa de `PLAN.md` está implementada y probada. Solo falta lo que depende del usuario: la cuenta de Cloudflare y el primer despliegue (ver §7).
+
 ```
-apps/api/        Worker Hono con toda la API de PLAN.md §2, esquema Drizzle, migración 0000_init.sql, wrangler.jsonc
-apps/web/        Astro 7 estático con Starwind UI (button, input, label, card) y una página de inicio mínima
-packages/core/   Sorteo sin puntos fijos (derangement) + 9 escenarios Gherkin (36 pasos) pasando
-packages/contract/  Esquemas Zod Mini de la API (crear evento, reclamar, token) + `parseWith` + 11 escenarios Gherkin (RF-1) pasando
+apps/api/           Worker Hono con toda la API (PLAN §2), D1 + Drizzle, cron de limpieza, 27 escenarios
+apps/web/           Astro estático: inicio/Mis eventos, crear, elegir nombre, ruleta, resultado, panel, 404
+apps/e2e/           4 escenarios de punta a punta con Playwright contra wrangler dev
+packages/core/      sorteo, reglas de reclamo, límite de contraseña, vencimiento y tira de la ruleta (22 escenarios)
+packages/contract/  esquemas Zod Mini y tipos de respuesta compartidos por API y web (13 escenarios)
+docs/despliegue.md  pasos para Cloudflare y GitHub
 ```
 
-- **Sorteo** (`packages/core/src/draw.ts`): puro, aleatoriedad inyectada (`secureRandomInt` para producción, `seededRandomInt` para pruebas). Baraja Fisher-Yates y descarta si alguien se toca a sí mismo. Valida 3–50 participantes y nombres únicos. Devuelve un tipo `Result`, no lanza excepciones.
-- **Esquema** (`apps/api/src/db/schema.ts`): `events`, `participants`, `assignments`. Índices únicos solo en `events.token` y `(participants.event_id, name)` para gastar pocas escrituras de D1.
-- **Verificación**: `pnpm verify` (Biome + typecheck + pruebas + build) pasa completo.
+- **Calidad medida** (local): carga < 0,8 s en 4G simulado; ~20 KB de JS comprimido en todo el sitio; botones con nombre accesible; modo oscuro y movimiento reducido revisados.
+- **Verificación**: `pnpm verify` y `pnpm test:e2e` pasan; el CI de GitHub ejecuta ambos.
 
 ## 5. Cómo trabajar (importante)
 
@@ -49,7 +52,8 @@ packages/contract/  Esquemas Zod Mini de la API (crear evento, reclamar, token) 
 export PATH=/opt/node26/bin:$PATH   # Node 26 está en /opt/node26 (si no existe, instalarlo); el Node del sistema es el 22
 pnpm install
 pnpm verify                          # antes de cada push
-pnpm test                            # solo Cucumber (packages/core)
+pnpm test                            # Cucumber: core, contract y API (D1 local)
+PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium pnpm test:e2e   # UI de punta a punta
 pnpm dlx starwind@latest add <componente>   # añadir componentes de UI
 ```
 
@@ -65,10 +69,16 @@ Si la sesión nueva no tiene `/opt/node26`, instalar Node 26 (LTS) desde nodejs.
 6. **Cuidado al encadenar comandos con `| tail`**: oculta el código de salida y puede dejar pasar errores de Biome. Usar `pnpm verify` y mirar su código de salida.
 7. La plantilla oficial de Astro y otras descargas de GitHub pueden fallar por la red; el proyecto web se creó a mano.
 8. Los errores de validación de Zod se convierten en `{ path, message }`; `path` usa puntos (p. ej. `participants.2`).
+9. **`wrangler dev` deja de servir la web si se recompila** `apps/web/dist` mientras corre: reiniciarlo.
+10. **`World` de Cucumber ya tiene `link`, `attach` y `log`**: no usar esos nombres como propiedades del mundo.
+11. **Playwright**: el paquete usa la última versión; el Chromium preinstalado de la sesión puede ser de otra versión, por eso existe `PLAYWRIGHT_CHROMIUM_PATH`.
 
 ## 7. Qué sigue
 
-El plan completo de v1, por fases y con criterios de terminado, está en [`PLAN.md`](./PLAN.md). La fase 0 ya tiene el CI hecho; seguir con las fundaciones de la API (core y contract como dependencias, wrangler y pruebas) y luego la fase 1.
+1. **Usuario**: configurar Cloudflare y GitHub según `docs/despliegue.md` y lanzar *Actions → Deploy*.
+2. **Usuario**: hacer de `main` la rama por defecto en GitHub.
+3. Tras el primer despliegue: comprobar en las métricas que solo `/api/*` cuenta solicitudes y que crear evento / entrar con contraseña no superan los 10 ms de CPU (si pasa, bajar `PASSWORD_ITERATIONS`).
+4. Prueba real con un grupo de amigos; lo que surja se registra primero en el PRD.
 
 ## 8. Decisiones del 2026-11-21
 

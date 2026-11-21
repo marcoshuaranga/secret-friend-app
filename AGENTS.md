@@ -41,15 +41,16 @@ Consecuencias de diseño:
 apps/
   api/   Worker con Hono y Drizzle (wrangler empaqueta desde src/index.ts)
   web/   Astro estático (todo .astro, sin frameworks de UI) + Tailwind + Starwind UI
+  e2e/   escenarios Gherkin de la UI con Playwright contra `wrangler dev`
 packages/
-  core/      núcleo puro del dominio (sorteo) + escenarios Gherkin (`features/`)
+  core/      núcleo puro del dominio (sorteo, reglas, tira de la ruleta) + escenarios Gherkin
   contract/  contrato de la API: esquemas Zod Mini compartidos por api y web + escenarios Gherkin
 ```
 
-- `packages/core`: TypeScript puro, sin dependencias de runtime. Se ejecuta directamente con Node 26 (type stripping; imports relativos con extensión `.ts`, sin `enum` ni parameter properties). El Worker lo consumirá como dependencia del workspace.
+- `packages/core`: TypeScript puro, sin dependencias de runtime. Se ejecuta directamente con Node 26 (type stripping; imports relativos con extensión `.ts`, sin `enum` ni parameter properties). El Worker y la web lo consumen como dependencia del workspace.
 - `packages/contract`: única fuente de los esquemas de entrada de la API (`createEventSchema`, `claimSchema`, `eventTokenSchema`) y de sus tipos (`z.infer`). Reutiliza los límites de `core` (3–50 participantes). Expone `parseWith(schema)(entrada)`, que devuelve un `Result` en lugar de lanzar. El API valida con él en el borde y el frontend puede importar los mismos tipos.
 - `apps/api/migrations`: migraciones SQL generadas con `drizzle-kit generate`; `apps/api/wrangler.jsonc` define el Worker, los assets (`../web/dist`, con `run_worker_first` solo para `/api/*`) y el binding D1 `DB`. El `database_id` es un marcador que el workflow de despliegue reemplaza. Un Cron Trigger diario ejecuta la limpieza. `pnpm --filter @secret-friend/api dev` levanta todo en local (antes: `pnpm build` y `db:migrate:local`).
-- Pruebas: `pnpm test` (Cucumber). Núcleo, contrato y API cubiertos. Las pruebas de la API usan `app.request()` contra un D1 local de `getPlatformProxy()` de wrangler (`apps/api/features/support/world.ts`); cada nombre de dispositivo en los escenarios es un tarro de cookies distinto.
+- Pruebas: `pnpm test` (Cucumber: núcleo, contrato y API) y `pnpm test:e2e` (compila la web, levanta `wrangler dev` con un D1 temporal y recorre la UI con Playwright en un teléfono simulado; en local, `PLAYWRIGHT_CHROMIUM_PATH` permite usar un Chromium ya instalado). CI ejecuta ambos. Las pruebas de la API usan `app.request()` contra un D1 local de `getPlatformProxy()` de wrangler (`apps/api/features/support/world.ts`); cada nombre de dispositivo en los escenarios es un tarro de cookies distinto.
 
 - **pnpm workspaces** (`apps/*`, `packages/*`). Los scripts de la raíz (`build`, `typecheck`, `check`) recorren todos los paquetes.
 - **Biome** vive en la raíz y cubre todo el repo (excepto Markdown, que se edita a mano).
@@ -76,11 +77,13 @@ packages/
 - **Todo Astro, sin islas**: no se usa ningún framework de UI. Está prohibido añadir directivas `client:*` o integraciones de frameworks de componentes. La interactividad se escribe con `<script>` (TypeScript) en componentes `.astro` y **custom elements** (Web Components) para piezas reutilizables como la ruleta y el selector de nombre. Los datos del servidor llegan por atributos `data-*`; el estado compartido, si hace falta, con Nano Stores.
 - Iconos SVG: los que trae Starwind (`@tabler/icons`), renderizados como SVG sin JS.
 - **Biome** para lint y formato.
-- Animación de la ruleta en CSS/JS propio; confeti con una librería ligera (p. ej. `canvas-confetti`).
+- Animación de la ruleta en CSS/JS propio (`src/components/Roulette.astro`, custom element `<sf-roulette>`); confeti con `canvas-confetti` **sin Web Worker** (`useWorker: false`), porque la CSP solo permite scripts propios.
+- **CSP**: `security.csp` de Astro genera los hashes de scripts y estilos en el build. No usar `<script is:inline>` con URLs externas ni atributos `style` en HTML; los estilos aplicados desde JS (`element.style`) sí están permitidos.
+- Páginas: `/` (Mis eventos y recuperación), `/nuevo`, `/e?t=`, `/admin?t=`. `build.format: "file"` evita la redirección de `/e` a `/e/`. Los textos viven en `src/i18n/es.ts`.
 
 ### Pruebas (BDD)
 - **Cucumber** con Gherkin; los escenarios viven en archivos `.feature` y describen comportamiento (crear evento, elegir nombre, girar la ruleta, nadie se toca a sí mismo).
-- Escenarios de UI con Playwright; escenarios de sorteo y API directamente contra la app Hono, sin navegador.
+- Escenarios de UI con Playwright (`apps/e2e`); escenarios de sorteo y API directamente contra la app Hono, sin navegador.
 - Todo cambio de comportamiento parte de un escenario Gherkin que referencie el requisito del PRD (RF-n).
 
 ## 4. Lineamientos de código

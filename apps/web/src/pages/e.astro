@@ -38,13 +38,13 @@ import Layout from "@/layouts/Layout.astro";
 
   <section id="result" class="flex flex-col items-center gap-4 text-center" hidden aria-live="polite">
     <p class="text-sm font-medium tracking-wide text-muted-foreground uppercase">{t.youGiftTo}</p>
-    <p id="receiver" class="text-4xl font-extrabold tracking-tight text-primary text-balance"></p>
+    <p id="receiver" class="text-4xl font-extrabold tracking-tight text-balance text-primary dark:text-indigo-300"></p>
     <Button id="calendar" variant="outline" hidden>{t.addToCalendar}</Button>
     <p class="text-xs text-muted-foreground">{t.openInBrowser}</p>
   </section>
 
   <footer id="organizer" class="border-t pt-4 text-center text-sm" hidden>
-    <a id="organizer-link" class="font-medium text-primary underline-offset-4 hover:underline"></a>
+    <a id="organizer-link" class="font-medium text-primary underline-offset-4 hover:underline dark:text-indigo-300"></a>
   </footer>
 
   <dialog
@@ -134,7 +134,8 @@ import Layout from "@/layouts/Layout.astro";
       }
       const reel = buildReel(secureRandomInt)(result.value.receiver, result.value.others);
       await roulette.play(reel, force);
-      setTimeout(() => renderResult(event, result.value.receiver), 1600);
+      const pause = matchMedia("(prefers-reduced-motion: reduce)").matches ? 300 : 1600;
+      setTimeout(() => renderResult(event, result.value.receiver), pause);
     });
     only("#spin");
   };
