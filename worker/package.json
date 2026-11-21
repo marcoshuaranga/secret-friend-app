@@ -1,0 +1,22 @@
+{
+  "name": "@secret-friend/worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.19",
+    "typia": "^15.4.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.8",
+    "@cloudflare/workers-types": "^5.20261121.1",
+    "@ttsc/unplugin": "^0.37.2",
+    "esbuild": "^0.28.2",
+    "ttsc": "^0.37.2",
+    "typescript": "^7.0.2"
+  }
+}
