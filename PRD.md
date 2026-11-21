@@ -1,6 +1,6 @@
 # PRD — Secret Friend (Amigo Secreto)
 
-> Estado: borrador v0.5 · Documento funcional y de negocio. Las decisiones técnicas y lineamientos viven en [`AGENTS.md`](./AGENTS.md). Los puntos marcados con **[Supuesto]** no fueron confirmados y deben validarse antes de implementar.
+> Estado: borrador v0.6 · Documento funcional y de negocio. Las decisiones técnicas y lineamientos viven en [`AGENTS.md`](./AGENTS.md). Los puntos marcados con **[Supuesto]** no fueron confirmados y deben validarse antes de implementar.
 
 ## 1. Resumen
 
@@ -32,10 +32,11 @@ Aplicación web *mobile first* para organizar un amigo secreto entre un grupo de
 1. **Crear evento** (organizador): ingresa nombre del evento y la lista de participantes (mínimo 3). Opcionales: fecha del intercambio y presupuesto sugerido.
 2. **Sorteo**: al crear el evento se genera la asignación completa y queda definida.
 3. **Compartir**: la app muestra el enlace único del evento para copiar o compartir (WhatsApp, etc.).
-4. **Elegir nombre** (participante): al abrir el enlace ve la lista de nombres y toca el suyo. Esto lo identifica y lo excluye de ser su propio amigo secreto.
-5. **Ruleta**: pantalla con una ruleta/carrusel vertical de nombres. El usuario hace **swipe hacia abajo** y la ruleta gira rápido, desacelera y se detiene en su amigo secreto.
+4. **Elegir nombre** (participante): al abrir el enlace ve la lista de nombres y toca el suyo. Esto lo identifica en ese dispositivo y lo excluye de ser su propio amigo secreto.
+5. **Ruleta**: pantalla con una ruleta/carrusel vertical de nombres, con puesta en escena de casino. El usuario hace **swipe hacia abajo** y la ruleta gira rápido, desacelera y se detiene en su amigo secreto.
 6. **Revelación**: aparece el nombre resaltado con **confeti** y animación. Se muestra el recordatorio de fecha y presupuesto si existen.
-7. **Revisitar**: si vuelve a abrir el enlace en el mismo dispositivo, ve directamente su resultado (sin repetir la ruleta, aunque puede repetir la animación de forma visual con el mismo resultado).
+7. **Revisitar**: si vuelve a abrir el enlace en el mismo dispositivo, ve directamente su resultado y puede volver a girar la ruleta las veces que quiera; siempre cae en el mismo nombre.
+8. **Administrar** (organizador): desde su enlace de administración ve quién ya eligió nombre y quién ya vio su resultado, libera nombres elegidos por error y edita o elimina el evento.
 
 ## 5. Requisitos funcionales
 
@@ -46,19 +47,27 @@ Aplicación web *mobile first* para organizar un amigo secreto entre un grupo de
 
 ### 5.2 Selección de identidad
 - RF-4: La lista muestra todos los participantes; el usuario toca el suyo y confirma ("¿Eres Ana?").
-- RF-5: Un nombre ya reclamado aparece marcado como tomado y no puede elegirse desde otro dispositivo. **[Supuesto]** Esto evita que alguien espíe la asignación de otro.
-- RF-6: Se recuerda la identidad en el dispositivo para poder volver a ver el resultado.
+- RF-5: Un nombre ya reclamado aparece marcado como tomado y no puede elegirse desde otro dispositivo. Esto evita que alguien espíe la asignación de otro.
+- RF-6: No hay sesiones de usuario: **el dispositivo es la identidad**. Al elegir el nombre, el dispositivo queda asociado a ese participante y se recuerda para volver a ver el resultado. Abrir el enlace en otro navegador o borrar los datos cuenta como otro dispositivo.
 
 ### 5.3 Ruleta
 - RF-7: Gesto principal: **swipe hacia abajo** que dispara el giro. Alternativa accesible: botón "Girar".
 - RF-8: La ruleta muestra los nombres de los demás participantes (nunca el propio) girando con inercia y desaceleración, y se detiene en el resultado real.
 - RF-9: El resultado está definido desde la creación del evento; la ruleta es puramente visual y nunca lo decide.
 - RF-10: Al terminar: confeti, vibración corta en móvil (si está disponible) y nombre destacado.
+- RF-14: La ruleta se puede girar **todas las veces que se quiera**; cada giro termina en el mismo resultado.
+- RF-15: Estilo **casino**: palanca de tragamonedas (el swipe), luces de marquesina, nombres que pasan casi deteniéndose antes del real, sonido opcional (apagado por defecto).
 
 ### 5.4 Sorteo
 - RF-11: Nadie puede tocarse a sí mismo.
 - RF-12: Cada participante regala a exactamente una persona y recibe de exactamente una. El reparto es aleatorio y justo: todas las combinaciones válidas son igual de probables.
 - RF-13: El sorteo se genera una sola vez y no cambia.
+
+### 5.5 Administración
+- RF-16: Al crear el evento, el organizador recibe un **enlace de administración** separado del enlace del evento. Se muestra una sola vez y se recuerda en su dispositivo.
+- RF-17: El panel muestra por participante si está libre, si ya eligió nombre y si ya vio su resultado. **Nunca muestra asignaciones.**
+- RF-18: El organizador puede liberar un nombre elegido para que se elija de nuevo (p. ej. alguien eligió mal o cambió de teléfono).
+- RF-19: El organizador puede editar nombre, fecha y presupuesto del evento, y eliminarlo. La lista de participantes no se edita después del sorteo.
 
 ## 6. Requisitos no funcionales
 
@@ -77,13 +86,15 @@ Aplicación web *mobile first* para organizar un amigo secreto entre un grupo de
 2. **Evento creado**: enlace para copiar/compartir.
 3. **Elegir nombre**: lista tocable con estados (libre / tomado).
 4. **Ruleta**: zona de swipe con indicación visual ("desliza hacia abajo").
-5. **Resultado**: nombre, confeti, fecha y presupuesto.
-6. **Errores**: enlace inválido/expirado, evento lleno de reclamos.
+5. **Resultado**: nombre, confeti, fecha y presupuesto, y botón para volver a girar.
+6. **Panel del organizador**: estado de los participantes y acciones de administración.
+7. **Errores**: enlace inválido/expirado, nombre ya tomado por otro dispositivo.
 
 ## 8. Casos borde
 
-- Alguien elige el nombre equivocado → **[Supuesto]** el organizador puede liberar un nombre reclamado (recibe una clave de administración al crear el evento).
-- Dispositivo cambiado o datos borrados → el nombre queda reclamado; se resuelve con la liberación del organizador.
+- Alguien elige el nombre equivocado → el organizador libera el nombre desde su panel.
+- Dispositivo cambiado, otro navegador o datos borrados → el nombre queda reclamado; se resuelve con la liberación del organizador.
+- El organizador pierde su enlace de administración → sin cuentas no hay recuperación; se advierte al crearlo.
 - Dos personas con el mismo nombre → el organizador debe diferenciarlas (p. ej. "Ana R.").
 - Mínimo de 3 participantes; con 2 el sorteo sería trivial.
 
@@ -101,6 +112,10 @@ Aplicación web *mobile first* para organizar un amigo secreto entre un grupo de
 
 ## 11. Preguntas abiertas
 
-1. ¿El organizador necesita un panel para ver quién ya reveló (sin ver asignaciones) y liberar nombres?
-2. ¿Se permiten exclusiones (parejas que no se pueden tocar) en v1?
-3. ¿Se permite volver a girar la ruleta o solo una vez? (Propuesta: una vez, luego solo se muestra el resultado.)
+1. ¿Se permiten exclusiones (parejas que no se pueden tocar) en v1? (Propuesta: no, quedan para v2.)
+
+### Resueltas (2026-11-21)
+
+- Panel del organizador: sí (RF-16 a RF-19).
+- Volver a girar la ruleta: sí, ilimitado y con estilo casino (RF-14, RF-15).
+- Identidad: el dispositivo es la sesión (RF-6).

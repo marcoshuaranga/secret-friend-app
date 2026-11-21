@@ -92,27 +92,42 @@ packages/
 - Biome es la única fuente de formato y lint; no se discute estilo fuera de su configuración.
 - Buenas prácticas generales: nombres claros, módulos con una responsabilidad, sin código muerto ni comentarios que repitan el código.
 
-## 5. Modelo de datos (borrador)
+## 5. Modelo de datos
 
 - `events(id, token, admin_token_hash, name, date, budget, created_at, expires_at)`
-- `participants(id, event_id, name, claimed_at, claim_token_hash)`
+- `participants(id, event_id, name, claimed_at, claim_token_hash, revealed_at)` (`revealed_at` llega en la migración `0001`)
 - `assignments(event_id, giver_id, receiver_id)`
 
-Tokens: aleatorios criptográficamente, largos, inadivinables; en base de datos solo se guarda su hash (SHA-256) cuando corresponda.
+Tokens: aleatorios criptográficamente (256 bits, base64url), inadivinables; en base de datos solo se guarda su hash (SHA-256). La clave de administración se valida buscando el evento por su `token` y comparando hashes en tiempo constante, sin índice adicional.
 
-## 6. API (borrador)
+### Identidad del dispositivo ("huella")
 
-| Método | Ruta | Función |
-|---|---|---|
-| POST | `/api/events` | Crea el evento y sortea. Devuelve el enlace y la clave de administración. |
-| GET | `/api/events/:token` | Datos públicos: nombre, fecha, presupuesto, participantes y cuáles están tomados. |
-| POST | `/api/events/:token/claim` | Reclama un nombre; devuelve un token de dispositivo. |
-| GET | `/api/events/:token/result` | Devuelve solo la asignación del participante identificado. |
+No hay sesiones de usuario: el dispositivo es la sesión (RF-6). La huella es un **token aleatorio de dispositivo** emitido por la API al reclamar un nombre, **no** un *fingerprint* del navegador. El *fingerprinting* está descartado: dos teléfonos iguales producen la misma huella (sobre todo en Safari), lo que permitiría ver el resultado de otro, y además cambia con actualizaciones del navegador.
 
-## 7. Sorteo
+- Se entrega como cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/events/<token>`, con vencimiento igual al del evento.
+- `localStorage` guarda solo estado de la interfaz (participante elegido por evento, si ya giró y la clave de administración del organizador). Envolver todo acceso en `try/catch`; nunca es fuente de verdad.
+- La clave de administración viaja en el fragmento de la URL (`/admin#<token>.<clave>`) y se envía a la API en `Authorization: Bearer`, para que no aparezca en registros ni en `Referer`.
+
+## 6. API
+
+| Método | Ruta | Auth | Función |
+|---|---|---|---|
+| POST | `/api/events` | — | Crea el evento y sortea. Devuelve el token del evento y la clave de administración. |
+| GET | `/api/events/:token` | — | Datos públicos: nombre, fecha, presupuesto, participantes y cuáles están tomados; `me` si la cookie corresponde. |
+| POST | `/api/events/:token/claim` | — | Reclama un nombre y emite la cookie del dispositivo. |
+| GET | `/api/events/:token/result` | cookie | Solo la asignación del participante identificado; la primera vez marca `revealed_at`. |
+| GET | `/api/events/:token/admin` | admin | Estado de los participantes (eligió, vio resultado), sin asignaciones. |
+| DELETE | `/api/events/:token/participants/:id/claim` | admin | Libera un nombre. |
+| PATCH | `/api/events/:token` | admin | Edita nombre, fecha y presupuesto. |
+| DELETE | `/api/events/:token` | admin | Elimina el evento en cascada. |
+
+Errores como `{ error: "<CODIGO>" }` (`INVALID_INPUT`, `NOT_FOUND`, `NAME_TAKEN`, `NOT_CLAIMED`, `UNAUTHORIZED`). Un evento vencido responde `NOT_FOUND`. Todo `/api/*` lleva `Cache-Control: no-store`. El detalle y el orden de construcción están en [`PLAN.md`](./PLAN.md).
+
+## 7. Sorteo y ruleta
 
 - Permutación sin puntos fijos (*derangement*), uniforme sobre las válidas, generada una sola vez al crear el evento e inmutable.
 - Función pura que recibe la lista y una fuente de aleatoriedad inyectada, para poder probarla con semillas fijas.
+- La ruleta se puede girar sin límite (RF-14). La secuencia de nombres que pasa por el carrete la genera una función pura del núcleo a partir del resultado y una semilla; la UI solo anima. El resultado se pide al servidor una vez y se reutiliza en cada giro.
 
 ## 8. Skills y herramientas
 

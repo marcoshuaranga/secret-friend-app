@@ -10,7 +10,7 @@ Amigo secreto web *mobile first*. Un enlace por evento; cada persona elige su no
 ## 2. Estado del repositorio
 
 - Rama de trabajo: **`main`** (trunk-based: todo va directo a `main`, sin ramas ni PR salvo petición explícita).
-- Último commit: `4ecb7be` — todo está subido, árbol de trabajo limpio.
+- Ver `git log` para el último commit; todo se sube a `main`.
 - La rama `ccr-04c706aa-saoadn` es legado de la primera sesión: quedó atrasada y no se debe usar.
 - **Pendiente del usuario**: hacer de `main` la rama por defecto en GitHub (Settings → Branches → Default branch). No se pudo hacer desde la sesión. Probablemente el defecto sigue siendo `ccr-04c706aa-saoadn`.
 
@@ -45,7 +45,7 @@ packages/core/   Sorteo sin puntos fijos (derangement) + 9 escenarios Gherkin (3
 ## 5. Cómo trabajar (importante)
 
 ```bash
-export PATH=/opt/node26/bin:$PATH   # Node 26 está en /opt/node26; el Node del sistema es el 22
+export PATH=/opt/node26/bin:$PATH   # Node 26 está en /opt/node26 (si no existe, instalarlo); el Node del sistema es el 22
 pnpm install
 pnpm verify                          # antes de cada push
 pnpm test                            # solo Cucumber (packages/core)
@@ -65,21 +65,15 @@ Si la sesión nueva no tiene `/opt/node26`, instalar Node 26 (LTS) desde nodejs.
 7. La plantilla oficial de Astro y otras descargas de GitHub pueden fallar por la red; el proyecto web se creó a mano.
 8. Typia con strings: las restricciones (`tags.MinLength`, etc.) van en los tipos; el validador se genera en el build (`typia.createValidate<T>()`).
 
-## 7. Qué sigue (en este orden sugerido)
+## 7. Qué sigue
 
-1. **API** (`apps/api`): rutas Hono de `AGENTS.md §6` —crear evento (sortea con `@secret-friend/core`), datos públicos, reclamar nombre, resultado propio—. Validar entradas con Typia; tokens aleatorios, guardar solo su hash SHA-256. Instalar `wrangler` para probar contra D1 local y escribir escenarios Gherkin de la API (RF-1 a RF-6, RF-9). Conectar `packages/core` como dependencia del workspace.
-2. **Crear la base D1 en Cloudflare** y reemplazar el marcador `database_id` en `apps/api/wrangler.jsonc`. Aplicar `migrations/0000_init.sql`.
-3. **UI** (`apps/web`): pantallas del PRD §7 —crear evento, evento creado (compartir enlace), elegir nombre, ruleta, resultado, errores—. Página única `/e?t=<token>`. Ruleta como custom element: swipe hacia abajo + botón "Girar" accesible, respeta `prefers-reduced-motion`, confeti (`canvas-confetti` u otra ligera), vibración corta.
-4. **CI**: workflow de GitHub Actions que ejecute `pnpm verify` en cada push a `main` (propuesto, no pedido todavía). Considerar el costo de la primera compilación de `ttsc` (necesita Go) en CI.
-5. **Despliegue** en Cloudflare (Workers Builds o `wrangler deploy`), comprobando que `run_worker_first` solo cubre `/api/*`.
-6. Skills de UX: la búsqueda inicial en la cuenta no encontró resultados; reintentar o diseñar a mano.
+El plan completo de v1, por fases y con criterios de terminado, está en [`PLAN.md`](./PLAN.md). Empezar por la fase 0 (fundaciones: core como dependencia, wrangler, CI y pruebas de la API).
 
-## 8. Preguntas abiertas con el usuario
+## 8. Decisiones del 2026-11-21 y preguntas abiertas
 
-1. ¿El organizador necesita un panel para ver quién ya reveló (sin ver asignaciones) y liberar nombres?
-2. ¿Exclusiones de parejas en la v1? (el PRD las deja para v2)
-3. ¿La ruleta se gira solo una vez? (propuesta: sí; después solo se muestra el resultado guardado)
-4. ¿Se agrega CI con GitHub Actions?
+- Confirmado: panel del organizador (RF-16 a RF-19), ruleta repetible con estilo casino (RF-14, RF-15) y el dispositivo como identidad (RF-6), implementado con un token aleatorio y no con *fingerprinting* del navegador (motivo en `AGENTS.md §5`).
+- Abierta: exclusiones de parejas en v1 (propuesta: v2).
+- CI con GitHub Actions: incluido en el plan (fase 0.3) a la espera de confirmación.
 
 ## 9. Notas sobre cómo trabaja el usuario
 
