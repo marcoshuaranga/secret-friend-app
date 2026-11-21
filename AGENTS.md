@@ -40,7 +40,7 @@ Consecuencias de diseño:
 ```
 apps/
   api/   Worker con Hono, Drizzle y Typia (build con esbuild + ttsc)
-  web/   Astro estático + React (islas) + Tailwind + shadcn/ui
+  web/   Astro estático (todo .astro, sin frameworks de UI) + Tailwind + Starwind UI
 packages/
   core/  núcleo puro del dominio (sorteo) + escenarios Gherkin (`features/`)
 ```
@@ -57,6 +57,7 @@ packages/
 - **Regla: usar las últimas versiones estables de todos los paquetes** (`pnpm up --latest -r`), salvo excepciones documentadas aquí.
 - **Node 26** (`.nvmrc`, `engines`) y **pnpm 12**.
 - pnpm 12 bloquea por defecto los scripts de instalación: solo se aprueban los necesarios en `allowBuilds` de `pnpm-workspace.yaml` (hoy, `esbuild`). Respetar también su política de antigüedad mínima de paquetes (cadena de suministro).
+- **Excepción**: `apps/web` desactiva `exactOptionalPropertyTypes` porque el código generado por Starwind no lo cumple; el resto de `strictest` sigue activo. El código vendorizado de Starwind (`src/components/starwind`, `starwind.css`) se excluye de Biome.
 - **Excepción**: `apps/web` usa **TypeScript 6** porque `astro check` aún no soporta TypeScript 7. `apps/api` usa TypeScript 7 (requerido por `ttsc`). Revisar al actualizar Astro.
 
 ## 3. Stack
@@ -69,10 +70,10 @@ packages/
 - **Typia 15 + esbuild (validado)**: Typia 15 ya no usa plugins de bundler propios; requiere `ttsc` (compilador basado en TypeScript-Go) y `@ttsc/unplugin/esbuild` en el build. `unplugin-typia` no es compatible. La primera compilación genera un binario en Go (tarda varios minutos y necesita la toolchain de Go y red); las siguientes tardan ~2 s. Hay que usar `ttsc`/`ttsx`, no `tsc`/`tsx`, para cualquier paso que ejecute el transformador.
 
 ### Frontend
-- **Astro** (estático), **Tailwind**, **shadcn/ui** como sistema de UI.
-- Iconos SVG: **[Supuesto]** `lucide`.
+- **Astro** (estático), **Tailwind 4** y **Starwind UI** como sistema de UI (componentes `.astro` copiados a `src/components/starwind`, gestionados con `pnpm dlx starwind@latest add <componente>`).
+- **Todo Astro, sin islas**: no se usa ningún framework de UI. Está prohibido añadir directivas `client:*` o integraciones de frameworks de componentes. La interactividad se escribe con `<script>` (TypeScript) en componentes `.astro` y **custom elements** (Web Components) para piezas reutilizables como la ruleta y el selector de nombre. Los datos del servidor llegan por atributos `data-*`; el estado compartido, si hace falta, con Nano Stores.
+- Iconos SVG: los que trae Starwind (`@tabler/icons`), renderizados como SVG sin JS.
 - **Biome** para lint y formato.
-- **[Supuesto]** shadcn/ui es para React: las islas interactivas (selección de nombre y ruleta) usan React, hidratadas solo donde hacen falta.
 - Animación de la ruleta en CSS/JS propio; confeti con una librería ligera (p. ej. `canvas-confetti`).
 
 ### Pruebas (BDD)
