@@ -1,6 +1,6 @@
 # PRD — Secret Friend (Amigo Secreto)
 
-> Estado: borrador v0.2 · Los puntos marcados con **[Supuesto]** no fueron confirmados y deben validarse antes de implementar.
+> Estado: borrador v0.3 · Los puntos marcados con **[Supuesto]** no fueron confirmados y deben validarse antes de implementar.
 
 ## 1. Resumen
 
@@ -74,9 +74,11 @@ Aplicación web *mobile first* para organizar un amigo secreto entre un grupo de
 Es un proyecto por diversión entre amigos. Toda la infraestructura debe caber en **planes gratuitos**. Ninguna decisión técnica debe introducir costos fijos.
 
 ### 7.2 Decisiones confirmadas
-- **Frontend**: Astro con **salida estática** (`output: 'static'`). Las páginas se generan en el build y se sirven desde CDN. Islas interactivas solo para la ruleta y la selección de nombre. Framework de isla **[Supuesto]**: Preact o Svelte por tamaño, o JS vanilla.
-- **Hosting**: **Cloudflare** (Pages / Workers Static Assets), plan gratuito.
-- **Base de datos**: **SQLite** con **Drizzle ORM**. Proveedor por definir (ver §7.4).
+- **Infraestructura**: **Cloudflare**, plan gratuito.
+- **Componentes**: **un único Worker con Static Assets** (sirve el sitio Astro estático y la API Hono) + **D1** como base de datos. Esto resuelve §7.3: la API vive en el mismo Worker (equivale a la opción A, sin Pages Functions).
+- **Frontend**: Astro con **salida estática** (`output: 'static'`), islas interactivas solo para la ruleta y la selección de nombre. SSR queda **pendiente de decidir** (ver §12); por defecto, estático.
+- **Base de datos**: **SQLite sobre D1** con **Drizzle ORM** (ver §7.4).
+- **Stack detallado**: ver §7.7.
 
 ### 7.3 Dónde vive la lógica de servidor
 Aunque el sitio sea estático, el sorteo y la privacidad exigen código en servidor: si las asignaciones llegaran al navegador, cualquiera podría verlas con las herramientas de desarrollo. Opciones, todas gratuitas:
@@ -114,6 +116,28 @@ Las opciones A y B no cambian el frontend, así que se puede decidir durante el 
 | POST | `/api/events/:token/claim` | Reclama un nombre; devuelve un token de dispositivo. |
 | GET | `/api/events/:token/result` | Devuelve solo la asignación del participante identificado. |
 
+### 7.7 Stack y convenciones
+
+**Backend**
+- TypeScript en modo `strict` (con `noUncheckedIndexedAccess` y `exactOptionalPropertyTypes`).
+- **Hono** (rutas) + **Drizzle** (ORM sobre D1) + **Typia** (validación y tipos en runtime a partir de los tipos TS).
+- **esbuild** para empaquetar el Worker. **[Riesgo]** Typia necesita un transformador de TypeScript; esbuild no los ejecuta, así que se usa un plugin de esbuild para Typia (p. ej. `unplugin-typia`). Hay que validarlo en el scaffold.
+- **Biome** para lint y formato.
+- Estilo de código: composición de funciones, inmutabilidad (`readonly`, sin mutaciones), *currying*, *fail fast* (validar en el borde y fallar pronto con errores tipados), funciones pequeñas y puras, efectos aislados en los bordes (D1, aleatoriedad, reloj).
+
+**Frontend**
+- **Astro** (estático) + **Tailwind** + **shadcn/ui** como sistema de UI.
+- Librería de iconos SVG popular **[Supuesto]**: `lucide`.
+- **Biome** para lint y formato.
+- **[Supuesto]** shadcn/ui está pensado para React, así que las islas interactivas usarían React. Se mantiene el JS mínimo: solo se hidrata la ruleta y la selección de nombre.
+
+**Pruebas (BDD)**
+- **Cucumber** con Gherkin. Los escenarios viven en archivos `.feature` y describen el comportamiento (crear evento, elegir nombre, girar la ruleta, nadie se toca a sí mismo).
+- **[Supuesto]** Pruebas de extremo a extremo con Playwright para los escenarios de UI. Los escenarios de sorteo y API pueden ejecutarse directamente contra la app Hono, sin navegador.
+
+**Herramientas de desarrollo**
+- Para UX se buscarán skills ya existentes con la herramienta de búsqueda de skills, para ahorrar tokens y no reinventar patrones.
+
 ## 8. Pantallas
 
 1. **Home / Crear evento**: formulario simple, lista dinámica de nombres.
@@ -146,6 +170,6 @@ Las opciones A y B no cambian el frontend, así que se puede decidir durante el 
 
 1. ¿El organizador necesita un panel para ver quién ya reveló (sin ver asignaciones) y liberar nombres?
 2. ¿Se permiten exclusiones (parejas que no se pueden tocar) en v1?
-3. Proveedor de SQLite: ¿D1 o Turso? (§7.4)
-4. Lógica de servidor: ¿opción A o B? (§7.3)
+3. ¿Se confirma D1 como base de datos? (en el stack se escribió "R1"; se asume D1, ya que R2 es almacenamiento de objetos y no se necesita).
+4. ¿SSR solo en `/e/[token]` para la vista previa al compartir, o todo estático? (§7.2)
 5. ¿Se permite volver a girar la ruleta o solo una vez? (Propuesta: una vez, luego solo se muestra el resultado.)
