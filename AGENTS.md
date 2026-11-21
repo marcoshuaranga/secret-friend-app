@@ -4,7 +4,7 @@ Guía técnica y lineamientos para quien programe en este repositorio (personas 
 El **qué** y el **por qué** viven en [`PRD.md`](./PRD.md); aquí vive el **cómo**.
 Si algo contradice al PRD en lo funcional, gana el PRD.
 
-> Los puntos marcados con **[Supuesto]** no fueron confirmados y deben validarse.
+> Las decisiones están cerradas; el detalle por fases está en [`PLAN.md`](./PLAN.md).
 
 ## 1. Restricción principal: costo cero
 
@@ -22,8 +22,8 @@ Límites relevantes del plan gratuito de Cloudflare (verificados por búsqueda; 
 | D1, almacenamiento | 500 MB por base de datos, 5 GB por cuenta |
 
 Consecuencias de diseño:
-- Hashes **rápidos (SHA-256)** para tokens aleatorios largos; nada de bcrypt/argon2 (riesgo de pasar los 10 ms de CPU).
-- **Pocos índices**: basta el `token` del evento y las claves foráneas necesarias.
+- Hashes **rápidos (SHA-256)** para tokens aleatorios largos; nada de bcrypt/argon2 (riesgo de pasar los 10 ms de CPU). La contraseña del organizador usa PBKDF2-SHA256 de WebCrypto con iteraciones calibradas (< 5 ms de CPU) más límite de intentos.
+- **Pocos índices**: solo los de la sección 5.
 - El frontend es estático para no consumir solicitudes del Worker al abrir páginas.
 
 ## 2. Arquitectura
@@ -39,16 +39,18 @@ Consecuencias de diseño:
 
 ```
 apps/
-  api/   Worker con Hono, Drizzle y Typia (build con esbuild + ttsc)
+  api/   Worker con Hono y Drizzle (build con esbuild)
   web/   Astro estático (todo .astro, sin frameworks de UI) + Tailwind + Starwind UI
 packages/
-  core/  núcleo puro del dominio (sorteo) + escenario Gherkin de dominio (`features/`)
-e2e/     escenarios Gherkin end to end (`features/`) + arnés Vitest/Playwright (`support/`, `specs/`)
+  core/      núcleo puro del dominio (sorteo) + escenarios Gherkin de dominio (`features/`)
+  contract/  contrato de la API: esquemas Zod Mini compartidos por api y web + escenarios Gherkin
+e2e/         escenarios Gherkin end to end (`features/`) + arnés Vitest/Playwright (`support/`, `specs/`)
 ```
 
 - `packages/core`: TypeScript puro, sin dependencias de runtime. Se ejecuta directamente con Node 26 (type stripping; imports relativos con extensión `.ts`, sin `enum` ni parameter properties). El Worker lo consumirá como dependencia del workspace.
+- `packages/contract`: única fuente de los esquemas de entrada de la API (`createEventSchema`, `claimSchema`, `eventTokenSchema`) y de sus tipos (`z.infer`). Reutiliza los límites de `core` (3–50 participantes). Expone `parseWith(schema)(entrada)`, que devuelve un `Result` en lugar de lanzar. El API valida con él en el borde y el frontend puede importar los mismos tipos.
 - `apps/api/migrations`: migraciones SQL generadas con `drizzle-kit generate`; `apps/api/wrangler.jsonc` define el Worker, los assets (`../web/dist`, con `run_worker_first` solo para `/api/*`) y el binding D1 `DB`. El `database_id` es un marcador: reemplazar al crear la base de datos.
-- Pruebas: `pnpm test` (Vitest: sorteo de dominio + convenciones de los features) y `pnpm test:e2e` (suite end to end completa, requiere la app corriendo). Estado: los features de `e2e/features` tienen sus pasos implementados salvo lo marcado `@wip` (panel del organizador, RF-15, y ruleta de un solo giro, RF-14); la suite se validó contra una app falsa desechable que cumple el contrato, incluida una prueba de mutación (detectó los fallos inyectados). Falta la app real.
+- Pruebas: `pnpm test` (Vitest: dominio de `core` y `contract` + convenciones de los features e2e) y `pnpm test:e2e` (suite end to end, requiere la app corriendo). Estado: sorteo (RF-11, RF-12) y validación de la creación de eventos (RF-1) cubiertos; los 13 features end to end (`e2e/features`) están definidos según el PRD v0.7 y marcados `@wip`: sus pasos se implementan con cada fase del plan.
 
 - **pnpm workspaces** (`apps/*`, `packages/*`). Los scripts de la raíz (`build`, `typecheck`, `check`) recorren todos los paquetes.
 - **Biome** vive en la raíz y cubre todo el repo (excepto Markdown, que se edita a mano).
@@ -59,16 +61,16 @@ e2e/     escenarios Gherkin end to end (`features/`) + arnés Vitest/Playwright 
 - **Node 26** (`.nvmrc`, `engines`) y **pnpm 12**.
 - pnpm 12 bloquea por defecto los scripts de instalación: solo se aprueban los necesarios en `allowBuilds` de `pnpm-workspace.yaml` (hoy, `esbuild`). Respetar también su política de antigüedad mínima de paquetes (cadena de suministro).
 - **Excepción**: `apps/web` desactiva `exactOptionalPropertyTypes` porque el código generado por Starwind no lo cumple; el resto de `strictest` sigue activo. El código vendorizado de Starwind (`src/components/starwind`, `starwind.css`) se excluye de Biome.
-- **Excepción**: `apps/web` usa **TypeScript 6** porque `astro check` aún no soporta TypeScript 7. `apps/api` usa TypeScript 7 (requerido por `ttsc`). Revisar al actualizar Astro.
+- **Excepción**: `apps/web` usa **TypeScript 6** porque `astro check` aún no soporta TypeScript 7. `apps/api`, `packages/core` y `packages/contract` usan TypeScript 7. Revisar al actualizar Astro.
 
 ## 3. Stack
 
 ### Backend
 - TypeScript en modo `strict` (con `noUncheckedIndexedAccess` y `exactOptionalPropertyTypes`).
-- **Hono** (rutas), **Drizzle** (ORM sobre D1), **Typia** (validación y tipos en runtime).
+- **Hono** (rutas), **Drizzle** (ORM sobre D1), **Zod Mini** (validación y tipos en runtime).
 - **esbuild** para empaquetar el Worker.
 - **Biome** para lint y formato.
-- **Typia 15 + esbuild (validado)**: Typia 15 ya no usa plugins de bundler propios; requiere `ttsc` (compilador basado en TypeScript-Go) y `@ttsc/unplugin/esbuild` en el build. `unplugin-typia` no es compatible. La primera compilación genera un binario en Go (tarda varios minutos y necesita la toolchain de Go y red); las siguientes tardan ~2 s. Hay que usar `ttsc`/`ttsx`, no `tsc`/`tsx`, para cualquier paso que ejecute el transformador.
+- **Validación: solo `zod/mini`** (API funcional y tree-shakable, bundle pequeño para el Worker y el navegador). Se usa `import * as z from "zod/mini"` y `z.safeParse(schema, dato)`; los límites se expresan con `.check(z.minLength(…), z.maxLength(…), z.regex(…), z.refine(…))` y los opcionales con `z.optional(…)`. **Prohibido** importar `zod`, `zod/v4` o `zod/v3`: Biome lo bloquea con `noRestrictedImports`. Los esquemas viven únicamente en `packages/contract`.
 
 ### Frontend
 - **Astro** (estático), **Tailwind 4** y **Starwind UI** como sistema de UI (componentes `.astro` copiados a `src/components/starwind`, gestionados con `pnpm dlx starwind@latest add <componente>`).
@@ -77,18 +79,15 @@ e2e/     escenarios Gherkin end to end (`features/`) + arnés Vitest/Playwright 
 - **Biome** para lint y formato.
 - Animación de la ruleta en CSS/JS propio; confeti con una librería ligera (p. ej. `canvas-confetti`).
 
-### Pruebas (BDD, end to end)
-- **Gherkin en inglés** (archivos `.feature`), ejecutado con **Vitest** + **`@amiceli/vitest-cucumber`**: cada `.feature` tiene un `*.spec.ts` que lo carga con `loadFeature` y lo implementa con `describeFeature`; la librería falla si falta un escenario o un paso, así que un feature está "hecho" cuando su spec pasa completo.
-- **End to end con Playwright**: la validación se hace contra la app desplegada localmente (Worker + assets, p. ej. `wrangler dev`), nunca contra funciones internas. URL en `E2E_BASE_URL` (por defecto `http://localhost:8787`); si la versión de Playwright no coincide con el Chromium instalado, usar `E2E_CHROMIUM_PATH`.
-  - `@ui`: navegador Chromium con viewport de móvil (`support/browser.ts`). **Cada persona del escenario es un dispositivo**: un `BrowserContext` aislado (almacenamiento propio), lo que permite probar "otro dispositivo", identidad recordada, movimiento reducido, `navigator.share` y `navigator.vibrate`.
-  - `@api`: `APIRequestContext` de Playwright contra el mismo Worker (privacidad, concurrencia de reclamos, integridad del sorteo).
-- **Contrato** (`e2e/support/contract.ts`): rutas y respuestas de la API, códigos de error, páginas y los `data-testid` (con `data-state`, `data-name`, `data-error`) que la UI debe exponer. Es la única fuente: si la app cambia, se cambia ahí.
-  - **Reloj de pruebas**: solo con la variable `E2E=true` en el Worker, el encabezado `x-e2e-now` (epoch ms) reemplaza la hora actual; así se prueba la expiración sin esperar 90 días. Nunca activarlo en producción.
-  - El navegador se instrumenta (`support/browser.ts`): se registran `navigator.vibrate`, `navigator.share` y los estados de la ruleta, y el swipe es un gesto táctil real (CDP).
-- **Pasos**: los comunes viven en `support/steps.ts` (`defineSteps`, compartidos entre features); los de `Scenario Outline` con `<placeholders>` se definen en el spec de cada feature, porque vitest-cucumber no comparte esos pasos. La lógica está en `support/actions.ts`.
-- **Etiquetas obligatorias** (las valida `e2e/specs/feature-conventions.spec.ts`): al menos un requisito (`@RF-n`, `@privacy`, `@a11y` o `@assumption`) y exactamente una capa (`@ui` o `@api`). Otras: `@smoke` (camino feliz mínimo); `@assumption` marca lo que depende de un **[Supuesto]** del PRD; `@wip` marca escenarios, reglas o features ya definidos pero con pasos aún sin implementar (Vitest los excluye y un feature `@wip` puede no tener spec todavía). Al implementarlos se quita `@wip`.
-- **Estilo Gherkin**: declarativo (comportamiento, no clics ni selectores), presente y tercera persona, un comportamiento por escenario, `Rule` para agrupar reglas de negocio, `Scenario Outline` + `Examples` para variantes, y personas con nombre (Ana, Beto, Carla, Diego) en lugar de "el usuario". Los textos de la UI están en español; los escenarios se refieren a errores por su código (`too_few_participants`) y los pasos los traducen al mensaje visible.
-- `packages/core/features` mantiene el escenario de dominio del sorteo (sin navegador), también con Vitest.
+### Pruebas (BDD)
+- **Gherkin en inglés**, ejecutado con **Vitest** + **`@amiceli/vitest-cucumber`** en todo el repo (un solo runner). Cada `.feature` tiene un `*.spec.ts` que lo carga con `loadFeature` y lo implementa con `describeFeature`; la librería falla si falta un escenario o un paso.
+- **Dominio** (`packages/core`, `packages/contract`): escenarios sin navegador ni E/S, etiquetados `@domain`.
+- **End to end** (`e2e/`): contra la app corriendo (Worker + assets, p. ej. `wrangler dev`), nunca contra funciones internas. URL en `E2E_BASE_URL` (por defecto `http://localhost:8787`); si la versión de Playwright no coincide con el Chromium instalado, usar `E2E_CHROMIUM_PATH`.
+  - `@ui`: Chromium con viewport de móvil (`support/browser.ts`). **Cada persona del escenario es un dispositivo**: un `BrowserContext` aislado con su propia cookie `sf_device`, lo que permite probar "otro dispositivo", "otro navegador", identidad recordada y movimiento reducido. El navegador se instrumenta: se registran `navigator.vibrate`, `navigator.share` y los estados de la ruleta, y el swipe es un gesto táctil real (CDP).
+  - `@api`: `APIRequestContext` de Playwright contra el mismo Worker, también un contexto (cookie) por dispositivo: privacidad, concurrencia de reclamos, permisos de administración, bloqueo de intentos e integridad del sorteo.
+  - Vencimiento y bloqueo por tiempo necesitan un **reloj de pruebas** inyectable en el Worker, activo solo en el entorno de pruebas; se define al implementar esos pasos.
+- **Etiquetas** (las valida `e2e/specs/feature-conventions.spec.ts`): al menos un requisito (`@RF-n`, `@privacy`, `@a11y`, `@retention`) y exactamente una capa (`@ui` o `@api`). Otras: `@smoke` (camino feliz mínimo) y `@wip` (definido pero con pasos aún sin implementar: Vitest lo excluye y un feature `@wip` puede no tener spec todavía; al implementarlo se quita `@wip`).
+- **Estilo Gherkin**: declarativo (comportamiento, no clics ni selectores), presente y tercera persona, `Given` como estado previo, un `When` por escenario, `Rule` para agrupar reglas de negocio (al final del archivo, porque todo lo que sigue a un `Rule` le pertenece), `Scenario Outline` + `Examples` para variantes del mismo resultado, y personas con nombre (Ana, Beto, Carla, Diego). Los textos de la UI están en español: los escenarios `@ui` describen el mensaje por su sentido y los `@api` usan los códigos de error de la sección 6.
 - Todo cambio de comportamiento parte de un escenario Gherkin que referencie el requisito del PRD (RF-n).
 
 ## 4. Lineamientos de código
@@ -96,35 +95,59 @@ e2e/     escenarios Gherkin end to end (`features/`) + arnés Vitest/Playwright 
 - **Composición de funciones**: funciones pequeñas, puras y componibles.
 - **Inmutabilidad**: `readonly`, `as const`, sin mutar argumentos ni estado compartido.
 - **Currying** para fijar dependencias y configuración (p. ej. `crearRepo(db)(...)`).
-- **Fail fast**: validar en el borde (Typia) y fallar pronto con errores tipados; no propagar datos sin validar.
+- **Fail fast**: validar en el borde (Zod Mini) y fallar pronto con errores tipados; no propagar datos sin validar.
 - **Efectos en los bordes**: D1, aleatoriedad y reloj se inyectan; el núcleo (sorteo, reglas) es puro y testeable de forma determinista.
 - Sin `any`; los errores esperados son valores (tipo resultado/unión), no excepciones.
 - Biome es la única fuente de formato y lint; no se discute estilo fuera de su configuración.
 - Buenas prácticas generales: nombres claros, módulos con una responsabilidad, sin código muerto ni comentarios que repitan el código.
 
-## 5. Modelo de datos (borrador)
+## 5. Modelo de datos
 
-- `events(id, token, admin_token_hash, name, date, budget, created_at, expires_at)`
-- `participants(id, event_id, name, claimed_at, claim_token_hash, revealed_at)` — `revealed_at` se marca la primera vez que el participante obtiene su resultado (estado "revelado" del panel, RF-15).
-- `assignments(event_id, giver_id, receiver_id)`
+- `devices(id, token_hash, fingerprint, created_at)` · único `token_hash`, índice `fingerprint`
+- `events(id, token, name, date, budget, admin_password_hash, admin_password_salt, failed_logins, login_window_start, created_at, expires_at)` · único `token`
+- `event_admins(event_id, device_id)` · PK `(event_id, device_id)`, índice `device_id`
+- `participants(id, event_id, name, device_id, claimed_at, revealed_at)` · únicos `(event_id, name)` y `(device_id, event_id)`
+- `assignments(event_id, giver_id, receiver_id)` · PK `(event_id, giver_id)`
 
-Tokens: aleatorios criptográficamente, largos, inadivinables; en base de datos solo se guarda su hash (SHA-256) cuando corresponda.
+Tokens: aleatorios criptográficamente (256 bits, base64url), inadivinables; en base de datos solo se guarda su hash SHA-256. Como no existe ninguna base real todavía, la migración `0000_init.sql` se regenera en lugar de añadir una incremental.
 
-## 6. API (borrador)
+### Identidad híbrida
 
-| Método | Ruta | Función |
-|---|---|---|
-| POST | `/api/events` | Crea el evento y sortea. Devuelve el enlace y la clave de administración. |
-| GET | `/api/events/:token` | Datos públicos: nombre, fecha, presupuesto, participantes y cuáles están tomados. |
-| POST | `/api/events/:token/claim` | Reclama un nombre; devuelve un token de dispositivo. |
-| GET | `/api/events/:token/result` | Devuelve solo la asignación del participante identificado. |
-| GET | `/api/events/:token/admin` | Panel del organizador (clave de administración): estado de cada participante, sin asignaciones (RF-15). |
-| POST | `/api/events/:token/release` | Libera un nombre reclamado (clave de administración); invalida el token de dispositivo anterior (RF-16). |
+No hay sesiones de usuario: el dispositivo es la cuenta (RF-6, RF-20).
 
-## 7. Sorteo
+- **ID del dispositivo**: token aleatorio emitido por la API en la cookie `sf_device` (`HttpOnly; Secure; SameSite=Strict; Path=/api; Max-Age=400 días`). Es lo único que identifica a participantes y administradores.
+- ***Fingerprint***: huella propia del navegador (sin librerías; FingerprintJS v4+ no tiene licencia de código abierto), reducida con SHA-256 en `apps/web/src/lib/fingerprint.ts`. **Nunca autoriza**: solo sugiere eventos al organizador que perdió su cookie (RF-21), mostrando nombre y fecha. Dos teléfonos iguales pueden coincidir, por eso no se usa para participantes.
+- **Contraseña del organizador**: autoriza a un dispositivo nuevo como administrador (`event_admins`). PBKDF2-SHA256 con sal, comparación en tiempo constante, 5 intentos fallidos por hora por evento.
+- `localStorage` solo guarda conveniencias de interfaz; envolver todo acceso en `try/catch`.
+
+## 6. API
+
+| Método | Ruta | Auth | Función |
+|---|---|---|---|
+| POST | `/api/events` | dispositivo | Crea el evento y sortea; el dispositivo queda como admin. |
+| GET | `/api/events/:token` | — | Datos públicos y participantes tomados; `me` e `isAdmin` según la cookie. |
+| POST | `/api/events/:token/claim` | dispositivo | Reclama un nombre. |
+| GET | `/api/events/:token/result` | dispositivo | Solo la asignación propia; la primera vez marca `revealed_at`. |
+| GET | `/api/me/events` | dispositivo | Mis eventos: creados y unidos. |
+| POST | `/api/recovery` | — | Eventos sugeridos por huella (solo `id`, `name`, `date`). |
+| POST | `/api/admin/login` | dispositivo | Contraseña del organizador; suma el dispositivo como admin. |
+| GET | `/api/events/:token/admin` | admin | Estado de los participantes, sin asignaciones. |
+| DELETE | `/api/events/:token/participants/:id/claim` | admin | Libera un nombre. |
+| PATCH | `/api/events/:token` | admin | Edita nombre, fecha y presupuesto. |
+| DELETE | `/api/events/:token` | admin | Elimina el evento en cascada. |
+
+Errores como `{ error: "<CODIGO>" }`: `INVALID_INPUT` (con `issues: [{ path, message }]` de `parseWith`), `NOT_FOUND` (también vencido), `NAME_TAKEN`, `ALREADY_CLAIMED`, `NOT_CLAIMED`, `UNAUTHORIZED`, `TOO_MANY_ATTEMPTS`. Todo `/api/*` lleva `Cache-Control: no-store`. El detalle está en [`PLAN.md`](./PLAN.md).
+
+### Despliegue
+
+- Workflow manual `.github/workflows/deploy.yml` (`workflow_dispatch`): `pnpm verify`, sustituye el `database_id` desde la variable `D1_DATABASE_ID`, aplica migraciones remotas y ejecuta `wrangler deploy`. Usa los *secrets* `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`, configurados por el usuario en GitHub. El repositorio no guarda identificadores de la cuenta.
+- Dominio: `*.workers.dev`. Un Cron Trigger diario borra eventos vencidos y dispositivos sin eventos.
+
+## 7. Sorteo y ruleta
 
 - Permutación sin puntos fijos (*derangement*), uniforme sobre las válidas, generada una sola vez al crear el evento e inmutable.
 - Función pura que recibe la lista y una fuente de aleatoriedad inyectada, para poder probarla con semillas fijas.
+- La ruleta se gira una sola vez (RF-14). El servidor es la fuente de verdad: `revealed_at` se marca al pedir el resultado y, si ya existe, la UI muestra el resultado sin ruleta. La secuencia de nombres del carrete la genera una función pura del núcleo a partir del resultado y una semilla; la UI solo anima.
 
 ## 8. Skills y herramientas
 
@@ -132,5 +155,11 @@ Tokens: aleatorios criptográficamente, largos, inadivinables; en base de datos 
 
 ## 9. Flujo de trabajo
 
-- Desarrollar en la rama indicada por la sesión; no crear PR sin pedirlo explícitamente.
-- Commits pequeños y descriptivos; cambios funcionales se reflejan primero en `PRD.md` y cambios técnicos aquí.
+**Trunk-based development**: `main` es la única rama de trabajo y la rama por defecto del repositorio.
+
+- Todos los cambios van **directamente a `main`**. No se crean ramas de funcionalidad ni PR salvo petición explícita.
+- Commits pequeños y frecuentes, cada uno coherente y desplegable por sí solo.
+- **`main` siempre debe estar en verde**: antes de cada push, ejecutar `pnpm verify` (Biome, typecheck, pruebas BDD y build). Si falla, se corrige antes de subir; no se sube código roto.
+- Para trabajo incompleto visible al usuario, usar interruptores de funcionalidad o dejar el código sin enlazar, en lugar de ramas de larga vida.
+- Los cambios funcionales se reflejan primero en `PRD.md` y los técnicos en este archivo, en el mismo commit que el código.
+- Mensajes de commit descriptivos, en imperativo.

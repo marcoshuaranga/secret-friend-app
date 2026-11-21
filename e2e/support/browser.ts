@@ -7,9 +7,16 @@ import {
   type Page,
 } from "playwright";
 import { baseUrl, chromiumPath } from "./env.ts";
-import { parseJson } from "./json.ts";
 
 let shared: Promise<Browser> | undefined;
+
+const parseJson = (raw: string): unknown => {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+};
 
 /** One browser per test file; every person in a scenario gets an isolated context (a phone). */
 export const browser = (): Promise<Browser> => {

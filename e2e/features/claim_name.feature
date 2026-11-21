@@ -1,27 +1,29 @@
+@wip
 Feature: Pick my own name
   As a participant
   I want to pick my own name from the event list
-  So that the app knows who I am and never makes me my own secret friend
+  So that my device is linked to me and I can see my secret friend
 
   Background:
     Given an event with participants "Ana, Beto, Carla, Diego"
 
+  @RF-4
   Rule: Every participant picks their own name and confirms it
 
-    @RF-4 @ui @smoke
+    @ui @smoke
     Scenario: The list shows every participant as available
       When Ana opens the event link
       Then Ana sees the participants "Ana, Beto, Carla, Diego"
       And every participant is shown as available
 
-    @RF-4 @ui
+    @ui
     Scenario: Picking a name asks for confirmation
       Given Ana has opened the event link
       When Ana picks "Ana" from the list
       Then Ana is asked to confirm being "Ana"
       And "Ana" is still available
 
-    @RF-4 @ui
+    @ui
     Scenario: Confirming the name claims it
       Given Ana has opened the event link
       And Ana has picked "Ana" from the list
@@ -29,7 +31,7 @@ Feature: Pick my own name
       Then Ana sees the roulette
       And "Ana" is shown as taken to everyone else
 
-    @RF-4 @ui
+    @ui
     Scenario: Cancelling the confirmation keeps the name available
       Given Ana has opened the event link
       And Ana has picked "Beto" from the list
@@ -37,39 +39,56 @@ Feature: Pick my own name
       Then Ana is back on the participant list
       And "Beto" is still available
 
-  Rule: A claimed name cannot be taken from another device
+  @RF-5
+  Rule: A name claimed on one device cannot be taken from another
 
-    @RF-5 @ui
+    @ui
     Scenario: A taken name cannot be picked
       Given Ana has claimed the name "Ana"
       When Beto opens the event link
       Then Beto sees "Ana" marked as taken
       And Beto cannot pick "Ana"
 
-    @RF-5 @api
+    @api
     Scenario: The API rejects claiming a taken name
-      Given Ana has claimed the name "Ana" through the API
-      When Beto claims the name "Ana" through the API
-      Then the claim is rejected as "name_taken"
+      Given Ana has claimed the name "Ana" from Ana's device
+      When Beto claims the name "Ana" from Beto's device
+      Then the claim is rejected as "NAME_TAKEN"
 
-    @RF-5 @api
+    @api
     Scenario: Only one of two simultaneous claims for the same name succeeds
-      When Ana and Beto claim the name "Carla" at the same time
+      When Ana and Beto claim the name "Carla" at the same time from their own devices
       Then exactly one claim succeeds
-      And the other claim is rejected as "name_taken"
+      And the other claim is rejected as "NAME_TAKEN"
 
-  Rule: The device remembers who I am
+  @RF-6
+  Rule: The device is the identity, and it holds one name per event
 
-    @RF-6 @ui
+    @api
+    Scenario: A device cannot claim a second name in the same event
+      Given Ana has claimed the name "Ana" from Ana's device
+      When Ana claims the name "Beto" from Ana's device
+      Then the claim is rejected as "ALREADY_CLAIMED"
+      And "Beto" is still available
+
+    @api
+    Scenario: Claiming my own name again changes nothing
+      Given Ana has claimed the name "Ana" from Ana's device
+      When Ana claims the name "Ana" from Ana's device
+      Then the claim succeeds
+      And "Ana" is still claimed by Ana's device
+
+    @ui
     Scenario: Reopening the link on the same device keeps my identity
       Given Ana has claimed the name "Ana"
       When Ana reopens the event link on the same device
       Then Ana is recognized as "Ana"
       And Ana is not asked to pick a name
 
-    @RF-6 @ui
-    Scenario: A new device does not inherit a claimed identity
+    @ui @RF-22
+    Scenario: Another browser counts as another device
       Given Ana has claimed the name "Ana"
-      When Ana opens the event link on a new device
+      When Ana opens the event link in another browser
       Then Ana sees the participant list
-      And "Ana" is shown as taken
+      And Ana sees "Ana" marked as taken
+      And Ana is told that another browser counts as another device and the organizer can release the name

@@ -1,4 +1,4 @@
-@RF-3 @ui
+@wip @RF-3 @ui
 Feature: Share the event link
   As an organizer
   I want to copy or share the event link right after creating the event

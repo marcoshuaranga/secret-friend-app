@@ -1,39 +1,48 @@
-@RF-16
+@wip @RF-18
 Feature: Release a claimed name
   As an organizer
-  I want to release, from my panel, a name that was claimed by mistake or from a lost device
-  So that the right person can claim it and see their secret friend
+  I want to release a name that was picked by mistake or from a lost device
+  So that the right person can pick it and see their secret friend
 
   Background:
-    Given an event with participants "Ana, Beto, Carla, Diego"
-    And Beto has claimed the name "Ana" by mistake
+    Given an event with participants "Ana, Beto, Carla, Diego" created on the organizer's device
+    And Beto has claimed the name "Ana" by mistake from Beto's device
 
   @ui
-  Scenario: The organizer releases a claimed name with the admin key
+  Scenario: Releasing a name asks for confirmation
     When the organizer releases "Ana" from the organizer panel
+    Then the organizer is asked to confirm releasing "Ana"
+    And "Ana" is still taken
+
+  @ui @smoke
+  Scenario: Confirming the release frees the name
+    Given the organizer has asked to release "Ana" from the organizer panel
+    When the organizer confirms the release
     Then "Ana" is available again
     And Ana can claim the name "Ana"
 
   @api
   Scenario: The previous device loses access after the release
-    When the organizer releases "Ana" with the admin key
-    Then the device token of Beto no longer gets a result
+    When the organizer releases "Ana" from the organizer's device
+    Then Beto's device no longer gets a result for "Ana"
+    And Beto's device can claim another name
 
-  @RF-13 @api
-  Scenario: The secret friend does not change after the name is released
+  @api @RF-13
+  Scenario: The secret friend does not change after the release
     Given the secret friend assigned to "Ana" is known
-    When the organizer releases "Ana" with the admin key
-    And Ana claims the name "Ana" through the API
+    When the organizer releases "Ana" from the organizer's device
+    And Ana claims the name "Ana" from Ana's device
     Then Ana gets the same secret friend as before
 
-  @api
-  Scenario Outline: A name cannot be released without the right admin key
-    When someone releases "Ana" <credentials>
-    Then the request is denied as "unauthorized"
-    And "Ana" is still taken
+  @ui @RF-14
+  Scenario: Whoever picks a released name spins the roulette again
+    Given Beto has spun the roulette as "Ana"
+    And the organizer has released "Ana"
+    When Ana claims the name "Ana"
+    Then Ana sees the roulette ready to spin
 
-    Examples:
-      | credentials                         |
-      | without an admin key                |
-      | with a wrong admin key              |
-      | with the admin key of another event |
+  @api
+  Scenario: A device that is not an organizer cannot release a name
+    When Carla releases "Ana" from Carla's device
+    Then the request is rejected as "UNAUTHORIZED"
+    And "Ana" is still taken

@@ -32,7 +32,18 @@
       },
       "style": {
         "noParameterAssign": "error",
-        "useConst": "error"
+        "useConst": "error",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "zod": "Importa desde \"zod/mini\"; el paquete completo \"zod\" no se usa en este proyecto.",
+              "zod/v4": "Importa desde \"zod/mini\"; el paquete completo \"zod\" no se usa en este proyecto.",
+              "zod/v3": "Importa desde \"zod/mini\"; el paquete completo \"zod\" no se usa en este proyecto.",
+              "zod/v4/core": "Importa desde \"zod/mini\"; el paquete completo \"zod\" no se usa en este proyecto."
+            }
+          }
+        }
       }
     }
   },

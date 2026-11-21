@@ -9,7 +9,7 @@ import { describe, expect, test } from "vitest";
 const featuresDir = new URL("../features/", import.meta.url);
 const files = (await readdir(featuresDir)).filter((file) => file.endsWith(".feature")).toSorted();
 
-const REQUIREMENT = /^(RF-\d+|privacy|a11y|assumption)$/;
+const REQUIREMENT = /^(RF-\d+|privacy|a11y|retention|assumption)$/;
 const LAYERS = ["ui", "api"] as const;
 
 interface ScenarioInfo {
