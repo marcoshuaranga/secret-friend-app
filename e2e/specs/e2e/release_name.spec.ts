@@ -24,7 +24,7 @@ describeFeature(feature, ({ Background, Scenario, ScenarioOutline, AfterEachScen
   Background(() => {});
 
   Scenario("The organizer releases a claimed name with the admin key", ({ When, Then, And }) => {
-    When('the organizer releases "Ana" from the admin page', async () => {
+    When('the organizer releases "Ana" from the organizer panel', async () => {
       const w = world();
       const { page } = await w.device("organizer");
       await page.goto(pages.admin(w.currentEvent.token));

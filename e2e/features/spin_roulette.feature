@@ -66,3 +66,22 @@ Feature: Spin the roulette
       When Ana presses the spin button
       Then the secret friend is revealed without a long spin
       And no confetti is shown
+
+  @RF-14 @wip
+  Rule: The roulette spins only once
+
+    Scenario Outline: Trying to spin again after the reveal does nothing
+      Given Ana has spun the roulette
+      When Ana tries to spin the roulette again by <gesture>
+      Then the roulette does not spin again
+      And Ana still sees the same secret friend
+
+      Examples:
+        | gesture                  |
+        | swiping down             |
+        | pressing the spin button |
+
+    Scenario: Reopening the link does not offer a new spin
+      Given Ana has spun the roulette
+      When Ana reopens the event link on the same device
+      Then Ana is not offered to spin the roulette

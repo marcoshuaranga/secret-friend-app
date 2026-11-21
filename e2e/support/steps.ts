@@ -1,4 +1,8 @@
-import { defineSteps } from "@amiceli/vitest-cucumber";
+import {
+  defineSteps,
+  getVitestCucumberConfiguration,
+  setVitestCucumberConfiguration,
+} from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
 import * as a from "./actions.ts";
 import { recorded } from "./browser.ts";
@@ -12,6 +16,9 @@ import { world } from "./world.ts";
  */
 type Keyword = "Given" | "When" | "Then" | "And" | "But";
 type Register = (text: string, fn: (ctx: unknown, ...params: never[]) => unknown) => void;
+
+/** `@wip`: defined in Gherkin, steps not implemented yet. */
+setVitestCucumberConfiguration({ ...getVitestCucumberConfiguration(), excludeTags: ["wip"] });
 
 defineSteps((keywords) => {
   const step = <P extends unknown[]>(text: string, fn: (...params: P) => unknown): void => {
@@ -240,10 +247,6 @@ defineSteps((keywords) => {
   );
   step("the roulette stops on the secret friend the server assigned to {word}", (person: string) =>
     a.expectRevealedMatchesServer(person),
-  );
-  step("{word} replays the reveal animation", (person: string) => a.replay(person));
-  step("the roulette stops on the same secret friend", () =>
-    expect(new Set(world().revealed).size).toBe(1),
   );
   step("the secret friend's name is highlighted", () => a.expectHighlighted("Ana"));
   step("confetti is shown", () => a.expectConfetti("Ana", true));

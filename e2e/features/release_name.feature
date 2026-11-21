@@ -1,7 +1,7 @@
-@assumption
+@RF-16
 Feature: Release a claimed name
   As an organizer
-  I want to release a name that was claimed by mistake or from a lost device
+  I want to release, from my panel, a name that was claimed by mistake or from a lost device
   So that the right person can claim it and see their secret friend
 
   Background:
@@ -10,7 +10,7 @@ Feature: Release a claimed name
 
   @ui
   Scenario: The organizer releases a claimed name with the admin key
-    When the organizer releases "Ana" from the admin page
+    When the organizer releases "Ana" from the organizer panel
     Then "Ana" is available again
     And Ana can claim the name "Ana"
 

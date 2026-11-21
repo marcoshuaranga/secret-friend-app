@@ -38,8 +38,9 @@ test("there are feature files", () => {
 
 describe.each(files)("%s", async (file) => {
   const scenarios = await scenariosOf(file);
+  const featureTags = (await loadFeature(new URL(file, featuresDir).pathname)).tags;
 
-  test("has an end-to-end spec that implements it", async () => {
+  test.skipIf(featureTags.has("wip"))("has an end-to-end spec that implements it", async () => {
     const spec = new URL(`../specs/e2e/${file.replace(/\.feature$/, ".spec.ts")}`, import.meta.url);
     await expect(access(spec)).resolves.toBeUndefined();
   });

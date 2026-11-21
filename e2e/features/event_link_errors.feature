@@ -32,13 +32,13 @@ Feature: Handle unusable event links
 
   Rule: An event expires 90 days after it is created
 
-    @assumption @ui
+    @RF-17 @ui
     Scenario: An event can still be opened before it expires
       Given an event created 89 days ago
       When a visitor opens the event link
       Then the visitor sees the participant list
 
-    @assumption @ui
+    @RF-17 @ui
     Scenario: An expired event shows an error page
       Given an event created 91 days ago
       When a visitor opens the event link

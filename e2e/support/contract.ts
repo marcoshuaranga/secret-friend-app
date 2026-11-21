@@ -56,7 +56,6 @@ export const ids = {
   roulette: "roulette", // data-state=idle|spinning|stopped
   rouletteItem: "roulette-item",
   spinButton: "spin-button",
-  replayButton: "replay-button",
   secretFriend: "secret-friend", // data-highlighted=true when revealed
   confetti: "confetti",
   exchangeDate: "exchange-date", // only rendered when the event has a date

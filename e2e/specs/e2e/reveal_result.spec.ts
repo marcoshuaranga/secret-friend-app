@@ -46,5 +46,4 @@ describeFeature(feature, ({ Scenario, ScenarioOutline, AfterEachScenario }) => {
   );
 
   Scenario("Revisiting the link shows the result straight away", () => {});
-  Scenario("The reveal animation can be replayed with the same result", () => {});
 });

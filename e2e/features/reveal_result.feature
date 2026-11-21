@@ -20,17 +20,9 @@ Feature: See my secret friend
       | no value     | "20 USD" | nothing about it | "20 USD"         |
       | no value     | no value | nothing about it | nothing about it |
 
-  @RF-6
+  @RF-6 @RF-14
   Scenario: Revisiting the link shows the result straight away
     Given Ana has claimed the name "Ana" in the event "Navidad 2026"
     And Ana has revealed the secret friend
     When Ana reopens the event link on the same device
     Then Ana sees the same secret friend without spinning the roulette
-
-  @RF-9 @RF-13
-  Scenario: The reveal animation can be replayed with the same result
-    Given Ana has claimed the name "Ana" in the event "Navidad 2026"
-    And Ana has revealed the secret friend
-    And Ana reopens the event link on the same device
-    When Ana replays the reveal animation
-    Then the roulette stops on the same secret friend

@@ -214,14 +214,6 @@ export const spin = async (
   return friend;
 };
 
-export const replay = async (person: string): Promise<string> => {
-  const { page } = await world().device(person);
-  await testId(page, ids.replayButton).click();
-  const friend = await waitForStop(page);
-  world().revealed.push(friend);
-  return friend;
-};
-
 export const expectSpun = async (person: string): Promise<void> => {
   const { page } = await world().device(person);
   expect((await recorded(page)).rouletteStates).toContain("spinning");

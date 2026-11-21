@@ -48,7 +48,7 @@ e2e/     escenarios Gherkin end to end (`features/`) + arnés Vitest/Playwright 
 
 - `packages/core`: TypeScript puro, sin dependencias de runtime. Se ejecuta directamente con Node 26 (type stripping; imports relativos con extensión `.ts`, sin `enum` ni parameter properties). El Worker lo consumirá como dependencia del workspace.
 - `apps/api/migrations`: migraciones SQL generadas con `drizzle-kit generate`; `apps/api/wrangler.jsonc` define el Worker, los assets (`../web/dist`, con `run_worker_first` solo para `/api/*`) y el binding D1 `DB`. El `database_id` es un marcador: reemplazar al crear la base de datos.
-- Pruebas: `pnpm test` (Vitest: sorteo de dominio + convenciones de los features) y `pnpm test:e2e` (suite end to end completa, requiere la app corriendo). Estado: los 9 features de `e2e/features` tienen sus pasos implementados; la suite se validó contra una app falsa desechable que cumple el contrato, incluida una prueba de mutación (detectó los fallos inyectados). Falta la app real.
+- Pruebas: `pnpm test` (Vitest: sorteo de dominio + convenciones de los features) y `pnpm test:e2e` (suite end to end completa, requiere la app corriendo). Estado: los features de `e2e/features` tienen sus pasos implementados salvo lo marcado `@wip` (panel del organizador, RF-15, y ruleta de un solo giro, RF-14); la suite se validó contra una app falsa desechable que cumple el contrato, incluida una prueba de mutación (detectó los fallos inyectados). Falta la app real.
 
 - **pnpm workspaces** (`apps/*`, `packages/*`). Los scripts de la raíz (`build`, `typecheck`, `check`) recorren todos los paquetes.
 - **Biome** vive en la raíz y cubre todo el repo (excepto Markdown, que se edita a mano).
@@ -86,7 +86,7 @@ e2e/     escenarios Gherkin end to end (`features/`) + arnés Vitest/Playwright 
   - **Reloj de pruebas**: solo con la variable `E2E=true` en el Worker, el encabezado `x-e2e-now` (epoch ms) reemplaza la hora actual; así se prueba la expiración sin esperar 90 días. Nunca activarlo en producción.
   - El navegador se instrumenta (`support/browser.ts`): se registran `navigator.vibrate`, `navigator.share` y los estados de la ruleta, y el swipe es un gesto táctil real (CDP).
 - **Pasos**: los comunes viven en `support/steps.ts` (`defineSteps`, compartidos entre features); los de `Scenario Outline` con `<placeholders>` se definen en el spec de cada feature, porque vitest-cucumber no comparte esos pasos. La lógica está en `support/actions.ts`.
-- **Etiquetas obligatorias** (las valida `e2e/specs/feature-conventions.spec.ts`): al menos un requisito (`@RF-n`, `@privacy`, `@a11y` o `@assumption`) y exactamente una capa (`@ui` o `@api`). Otras: `@smoke` (camino feliz mínimo). `@assumption` marca lo que depende de un **[Supuesto]** del PRD.
+- **Etiquetas obligatorias** (las valida `e2e/specs/feature-conventions.spec.ts`): al menos un requisito (`@RF-n`, `@privacy`, `@a11y` o `@assumption`) y exactamente una capa (`@ui` o `@api`). Otras: `@smoke` (camino feliz mínimo); `@assumption` marca lo que depende de un **[Supuesto]** del PRD; `@wip` marca escenarios, reglas o features ya definidos pero con pasos aún sin implementar (Vitest los excluye y un feature `@wip` puede no tener spec todavía). Al implementarlos se quita `@wip`.
 - **Estilo Gherkin**: declarativo (comportamiento, no clics ni selectores), presente y tercera persona, un comportamiento por escenario, `Rule` para agrupar reglas de negocio, `Scenario Outline` + `Examples` para variantes, y personas con nombre (Ana, Beto, Carla, Diego) en lugar de "el usuario". Los textos de la UI están en español; los escenarios se refieren a errores por su código (`too_few_participants`) y los pasos los traducen al mensaje visible.
 - `packages/core/features` mantiene el escenario de dominio del sorteo (sin navegador), también con Vitest.
 - Todo cambio de comportamiento parte de un escenario Gherkin que referencie el requisito del PRD (RF-n).
@@ -105,7 +105,7 @@ e2e/     escenarios Gherkin end to end (`features/`) + arnés Vitest/Playwright 
 ## 5. Modelo de datos (borrador)
 
 - `events(id, token, admin_token_hash, name, date, budget, created_at, expires_at)`
-- `participants(id, event_id, name, claimed_at, claim_token_hash)`
+- `participants(id, event_id, name, claimed_at, claim_token_hash, revealed_at)` — `revealed_at` se marca la primera vez que el participante obtiene su resultado (estado "revelado" del panel, RF-15).
 - `assignments(event_id, giver_id, receiver_id)`
 
 Tokens: aleatorios criptográficamente, largos, inadivinables; en base de datos solo se guarda su hash (SHA-256) cuando corresponda.
@@ -118,6 +118,8 @@ Tokens: aleatorios criptográficamente, largos, inadivinables; en base de datos 
 | GET | `/api/events/:token` | Datos públicos: nombre, fecha, presupuesto, participantes y cuáles están tomados. |
 | POST | `/api/events/:token/claim` | Reclama un nombre; devuelve un token de dispositivo. |
 | GET | `/api/events/:token/result` | Devuelve solo la asignación del participante identificado. |
+| GET | `/api/events/:token/admin` | Panel del organizador (clave de administración): estado de cada participante, sin asignaciones (RF-15). |
+| POST | `/api/events/:token/release` | Libera un nombre reclamado (clave de administración); invalida el token de dispositivo anterior (RF-16). |
 
 ## 7. Sorteo
 
