@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "secret-friend",
+  "main": "dist/index.js",
+  "compatibility_date": "2026-11-21",
+  "assets": {
+    "directory": "../web/dist",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "secret-friend",
+      "database_id": "REEMPLAZAR_AL_CREAR_LA_BASE_DE_DATOS",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

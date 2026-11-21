@@ -41,8 +41,13 @@ Consecuencias de diseño:
 apps/
   api/   Worker con Hono, Drizzle y Typia (build con esbuild + ttsc)
   web/   Astro estático + React (islas) + Tailwind + shadcn/ui
-packages/  código compartido (p. ej. contrato de la API, núcleo del sorteo)
+packages/
+  core/  núcleo puro del dominio (sorteo) + escenarios Gherkin (`features/`)
 ```
+
+- `packages/core`: TypeScript puro, sin dependencias de runtime. Se ejecuta directamente con Node 26 (type stripping; imports relativos con extensión `.ts`, sin `enum` ni parameter properties). El Worker lo consumirá como dependencia del workspace.
+- `apps/api/migrations`: migraciones SQL generadas con `drizzle-kit generate`; `apps/api/wrangler.jsonc` define el Worker, los assets (`../web/dist`, con `run_worker_first` solo para `/api/*`) y el binding D1 `DB`. El `database_id` es un marcador: reemplazar al crear la base de datos.
+- Pruebas: `pnpm test` (Cucumber). Estado: sorteo cubierto (RF-11, RF-12); faltan escenarios de la API y de la UI.
 
 - **pnpm workspaces** (`apps/*`, `packages/*`). Los scripts de la raíz (`build`, `typecheck`, `check`) recorren todos los paquetes.
 - **Biome** vive en la raíz y cubre todo el repo (excepto Markdown, que se edita a mano).
