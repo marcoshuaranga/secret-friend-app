@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify (check, typecheck, test, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      # La versión de pnpm sale del campo "packageManager" de package.json.
+      - uses: pnpm/action-setup@v6
+
+      # La versión de Node sale de .nvmrc (Node 26).
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # ttsc compila un plugin de Typia en Go (descarga el toolchain de Go requerido).
+      # Sin caché la primera compilación tarda varios minutos.
+      # ~/go/pkg/mod guarda módulos y toolchain (~450 MB); node_modules/.cache/ttsc es la
+      # caché de compilación propia de ttsc (~2,8 GB sin comprimir).
+      - name: Cache Go toolchain and ttsc build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            node_modules/.cache/ttsc
+          key: go-ttsc-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            go-ttsc-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify
+        run: pnpm verify
