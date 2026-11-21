@@ -1,6 +1,6 @@
 # PRD — Secret Friend (Amigo Secreto)
 
-> Estado: borrador v0.1 · Los puntos marcados con **[Supuesto]** no fueron confirmados y deben validarse antes de implementar.
+> Estado: borrador v0.2 · Los puntos marcados con **[Supuesto]** no fueron confirmados y deben validarse antes de implementar.
 
 ## 1. Resumen
 
@@ -68,16 +68,43 @@ Aplicación web *mobile first* para organizar un amigo secreto entre un grupo de
 - **Idioma**: español (v1). **[Supuesto]** Preparar textos para i18n futura.
 - **Sin cuentas ni datos personales** más allá de los nombres ingresados. Evento con expiración automática. **[Supuesto]** 90 días.
 
-## 7. Enfoque técnico (propuesto)
+## 7. Enfoque técnico
 
-- **Frontend**: Astro (requerido) con islas interactivas para la ruleta y la selección de nombre. Framework de isla **[Supuesto]**: Svelte o Preact por tamaño.
-- **Backend**: endpoints de Astro en modo SSR/server (`src/pages/api/*`). El sorteo y la validación viven en el servidor.
-- **Persistencia** **[Supuesto]**: base de datos ligera (SQLite/Turso o similar). Esquema mínimo:
-  - `events(id, token, name, date, budget, created_at, expires_at)`
-  - `participants(id, event_id, name, claimed, claim_token_hash)`
-  - `assignments(giver_id, receiver_id)`
-- **Animación**: CSS/JS propio para la ruleta + una librería ligera de confeti (p. ej. `canvas-confetti`).
-- **Despliegue**: adaptador de Astro acorde al hosting elegido (por definir).
+### 7.1 Restricción principal: costo cero
+Es un proyecto por diversión entre amigos. Toda la infraestructura debe caber en **planes gratuitos**. Ninguna decisión técnica debe introducir costos fijos.
+
+### 7.2 Decisiones confirmadas
+- **Frontend**: Astro con **salida estática** (`output: 'static'`). Las páginas se generan en el build y se sirven desde CDN. Islas interactivas solo para la ruleta y la selección de nombre. Framework de isla **[Supuesto]**: Preact o Svelte por tamaño, o JS vanilla.
+- **Hosting**: **Cloudflare** (Pages / Workers Static Assets), plan gratuito.
+- **Base de datos**: **SQLite** con **Drizzle ORM**. Proveedor por definir (ver §7.4).
+
+### 7.3 Dónde vive la lógica de servidor
+Aunque el sitio sea estático, el sorteo y la privacidad exigen código en servidor: si las asignaciones llegaran al navegador, cualquiera podría verlas con las herramientas de desarrollo. Opciones, todas gratuitas:
+
+| Opción | Descripción | Pros | Contras |
+|---|---|---|---|
+| **A. Pages Functions / Worker aparte** (recomendada) | Astro 100% estático + carpeta `functions/api/*` (o un Worker) con la API. | El frontend queda puramente estático; separación clara. | Dos piezas que mantener en el mismo repo. |
+| B. Astro estático + rutas on-demand | `output: 'static'` con el adaptador `@astrojs/cloudflare` y `export const prerender = false` solo en `src/pages/api/*`. | Todo dentro de Astro; un solo proyecto. | Ya es un modo híbrido; depende del adaptador. |
+| C. SSR completo | Todo renderizado en Workers. | Máxima flexibilidad. | Innecesario para este alcance; descartado por ahora. |
+
+Las opciones A y B no cambian el frontend, así que se puede decidir durante el scaffold.
+
+### 7.4 Proveedor de SQLite
+| Proveedor | Plan gratuito | Encaje con Cloudflare + Drizzle |
+|---|---|---|
+| **Cloudflare D1** | Incluido en el plan gratuito de Workers. | Nativo (binding directo, sin credenciales externas). Drizzle tiene driver `d1`. |
+| **Turso** | Plan gratuito con límites generosos. | Driver `libsql` de Drizzle; requiere token como secreto. |
+
+**[Supuesto] Recomendación:** D1, porque mantiene todo en una sola cuenta y no necesita credenciales externas. Turso queda como alternativa si se quiere portabilidad fuera de Cloudflare. Con Drizzle, el cambio entre ambos afecta casi solo la configuración del cliente.
+
+### 7.5 Esquema mínimo
+- `events(id, token, admin_token_hash, name, date, budget, created_at, expires_at)`
+- `participants(id, event_id, name, claimed_at, claim_token_hash)`
+- `assignments(event_id, giver_id, receiver_id)`
+
+### 7.6 Otros
+- **Animación**: CSS/JS propio para la ruleta + librería ligera de confeti (p. ej. `canvas-confetti`).
+- **Enlace del evento**: como el sitio es estático, el enlace usa una sola página con el token en la query o en el hash (p. ej. `/e?t=abc123` o `/e#abc123`), y la isla consulta la API. Así no hace falta generar una página por evento.
 
 ### API (borrador)
 | Método | Ruta | Función |
@@ -119,5 +146,6 @@ Aplicación web *mobile first* para organizar un amigo secreto entre un grupo de
 
 1. ¿El organizador necesita un panel para ver quién ya reveló (sin ver asignaciones) y liberar nombres?
 2. ¿Se permiten exclusiones (parejas que no se pueden tocar) en v1?
-3. ¿Hosting y base de datos preferidos?
-4. ¿Se permite volver a girar la ruleta o solo una vez? (Propuesta: una vez, luego solo se muestra el resultado.)
+3. Proveedor de SQLite: ¿D1 o Turso? (§7.4)
+4. Lógica de servidor: ¿opción A o B? (§7.3)
+5. ¿Se permite volver a girar la ruleta o solo una vez? (Propuesta: una vez, luego solo se muestra el resultado.)
