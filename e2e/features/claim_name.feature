@@ -48,7 +48,7 @@ Feature: Pick my own name
 
     @RF-5 @api
     Scenario: The API rejects claiming a taken name
-      Given Ana has claimed the name "Ana"
+      Given Ana has claimed the name "Ana" through the API
       When Beto claims the name "Ana" through the API
       Then the claim is rejected as "name_taken"
 

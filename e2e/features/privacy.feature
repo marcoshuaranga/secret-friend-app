@@ -26,9 +26,9 @@ Feature: Keep every assignment private
 
   @api
   Scenario: A device token only reveals its own assignment
-    Given Ana has claimed the name "Ana"
-    And Beto has claimed the name "Beto"
-    When Ana requests the result with Ana's device token
+    Given Ana has claimed the name "Ana" through the API
+    And Beto has claimed the name "Beto" through the API
+    When Ana requests the result with the device token of Ana
     Then the response contains only the secret friend of "Ana"
 
   @api
@@ -40,5 +40,5 @@ Feature: Keep every assignment private
   Scenario: Nothing on the device exposes other assignments
     Given Ana has claimed the name "Ana"
     When Ana reveals the secret friend
-    Then no network response received by Ana's device contains another participant's assignment
-    And no data stored on Ana's device contains another participant's assignment
+    Then no network response received by the device of Ana contains another participant's assignment
+    And no data stored on the device of Ana contains another participant's assignment

@@ -21,6 +21,7 @@ Feature: Fair and fixed draw
   @RF-13
   Scenario: The draw is fixed when the event is created
     Given an event with participants "Ana, Beto, Carla, Diego"
-    And Ana has revealed the secret friend
-    When Ana asks for the result again
+    And Ana has claimed the name "Ana" through the API
+    And Ana has fetched the secret friend
+    When Ana fetches the secret friend again
     Then Ana gets the same secret friend

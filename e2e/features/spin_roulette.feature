@@ -14,13 +14,13 @@ Feature: Spin the roulette
     Scenario: Swipe down to spin
       When Ana swipes down on the roulette
       Then the roulette spins
-      And the roulette stops on Ana's secret friend
+      And the roulette reveals a secret friend
 
     @RF-7
     Scenario: Press the spin button instead of swiping
       When Ana presses the spin button
       Then the roulette spins
-      And the roulette stops on Ana's secret friend
+      And the roulette reveals a secret friend
 
     @RF-7
     Scenario Outline: Other gestures do not spin the roulette
@@ -55,11 +55,11 @@ Feature: Spin the roulette
 
     @RF-10
     Scenario Outline: Celebrate the reveal
-      Given the device <vibration> vibration
+      Given the phone <vibration> vibration
       When Ana spins the roulette
       Then the secret friend's name is highlighted
       And confetti is shown
-      And the device <vibrates>
+      And the phone <vibrates>
 
       Examples:
         | vibration        | vibrates         |

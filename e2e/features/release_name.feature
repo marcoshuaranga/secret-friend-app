@@ -10,20 +10,20 @@ Feature: Release a claimed name
 
   @ui
   Scenario: The organizer releases a claimed name with the admin key
-    When the organizer releases "Ana" with the admin key
+    When the organizer releases "Ana" from the admin page
     Then "Ana" is available again
     And Ana can claim the name "Ana"
 
   @api
   Scenario: The previous device loses access after the release
     When the organizer releases "Ana" with the admin key
-    Then Beto's device token no longer gets a result
+    Then the device token of Beto no longer gets a result
 
   @RF-13 @api
   Scenario: The secret friend does not change after the name is released
     Given the secret friend assigned to "Ana" is known
     When the organizer releases "Ana" with the admin key
-    And Ana claims the name "Ana"
+    And Ana claims the name "Ana" through the API
     Then Ana gets the same secret friend as before
 
   @api

@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { access, readdir } from "node:fs/promises";
 import { loadFeature } from "@amiceli/vitest-cucumber";
 import { describe, expect, test } from "vitest";
 
@@ -38,6 +38,11 @@ test("there are feature files", () => {
 
 describe.each(files)("%s", async (file) => {
   const scenarios = await scenariosOf(file);
+
+  test("has an end-to-end spec that implements it", async () => {
+    const spec = new URL(`../specs/e2e/${file.replace(/\.feature$/, ".spec.ts")}`, import.meta.url);
+    await expect(access(spec)).resolves.toBeUndefined();
+  });
 
   test("has scenarios with unique titles", () => {
     const titles = scenarios.map((s) => s.title);

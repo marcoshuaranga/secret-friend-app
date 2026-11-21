@@ -18,9 +18,8 @@ Feature: Create an event
     Scenario: Create an event with an exchange date and a suggested budget
       Given the organizer is on the create event page
       When the organizer creates the event "Navidad 2026" with:
-        | participants | Ana, Beto, Carla, Diego |
-        | date         | 2026-12-24              |
-        | budget       | 20 USD                  |
+        | participants            | date       | budget |
+        | Ana, Beto, Carla, Diego | 2026-12-24 | 20 USD |
       Then the event is created
       And anyone opening the event link sees the date "2026-12-24" and the budget "20 USD"
 
