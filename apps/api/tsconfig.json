@@ -9,8 +9,7 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noEmit": true,
-    "skipLibCheck": true,
-    "plugins": [{ "transform": "typia/lib/transform" }]
+    "skipLibCheck": true
   },
   "include": ["src"]
 }

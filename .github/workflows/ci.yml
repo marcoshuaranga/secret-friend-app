@@ -29,20 +29,6 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      # ttsc compila un plugin de Typia en Go (descarga el toolchain de Go requerido).
-      # Sin caché la primera compilación tarda varios minutos.
-      # ~/go/pkg/mod guarda módulos y toolchain (~450 MB); node_modules/.cache/ttsc es la
-      # caché de compilación propia de ttsc (~2,8 GB sin comprimir).
-      - name: Cache Go toolchain and ttsc build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            node_modules/.cache/ttsc
-          key: go-ttsc-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            go-ttsc-${{ runner.os }}-
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 

@@ -8,15 +8,12 @@
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",
-    "hono": "^4.13.19",
-    "typia": "^15.4.1"
+    "hono": "^4.13.19"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261121.1",
-    "@ttsc/unplugin": "^0.37.2",
     "drizzle-kit": "^0.31.11",
     "esbuild": "^0.28.2",
-    "ttsc": "^0.37.2",
     "typescript": "^7.0.2"
   }
 }

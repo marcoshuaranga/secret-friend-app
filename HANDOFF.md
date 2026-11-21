@@ -10,7 +10,7 @@ Amigo secreto web *mobile first*. Un enlace por evento; cada persona elige su no
 ## 2. Estado del repositorio
 
 - Rama de trabajo: **`main`** (trunk-based: todo va directo a `main`, sin ramas ni PR salvo petición explícita).
-- Último commit: `4ecb7be` — todo está subido, árbol de trabajo limpio.
+- Último commit: ver `git log` (todo está subido a `main`, árbol de trabajo limpio al cierre de la sesión).
 - La rama `ccr-04c706aa-saoadn` es legado de la primera sesión: quedó atrasada y no se debe usar.
 - **Pendiente del usuario**: hacer de `main` la rama por defecto en GitHub (Settings → Branches → Default branch). No se pudo hacer desde la sesión. Probablemente el defecto sigue siendo `ccr-04c706aa-saoadn`.
 
@@ -22,7 +22,7 @@ Amigo secreto web *mobile first*. Un enlace por evento; cada persona elige su no
 | Despliegue | Un único Worker con Static Assets: sirve el sitio Astro estático y la API Hono bajo `/api/*` |
 | Base de datos | D1 (SQLite) con Drizzle ORM |
 | Frontend | Astro estático, **sin SSR**, **sin islas ni frameworks de UI**; Tailwind 4 + **Starwind UI**; interactividad con `<script>` TS y custom elements |
-| Backend | TypeScript estricto, Hono, Drizzle, Typia, esbuild, Biome; estilo funcional (composición, inmutabilidad, currying, fail fast) |
+| Backend | TypeScript estricto, Hono, Drizzle, **Zod Mini** (`zod/mini`, único punto de entrada permitido), esbuild, Biome; estilo funcional (composición, inmutabilidad, currying, fail fast) |
 | Pruebas | BDD con Cucumber/Gherkin (en español) |
 | Toolchain | Node 26, pnpm 12, últimas versiones de todo salvo excepciones de `AGENTS.md` |
 | Flujo | Trunk-based; ejecutar `pnpm verify` antes de cada push |
@@ -33,9 +33,10 @@ Decisiones de producto aún **no confirmadas** (marcadas **[Supuesto]** en el PR
 ## 4. Qué hay construido
 
 ```
-apps/api/        Worker Hono (solo GET /api/health), esquema Drizzle, migración 0000_init.sql, wrangler.jsonc, build esbuild+ttsc
+apps/api/        Worker Hono (solo GET /api/health), esquema Drizzle, migración 0000_init.sql, wrangler.jsonc, build esbuild
 apps/web/        Astro 7 estático con Starwind UI (button, input, label, card) y una página de inicio mínima
 packages/core/   Sorteo sin puntos fijos (derangement) + 9 escenarios Gherkin (36 pasos) pasando
+packages/contract/  Esquemas Zod Mini de la API (crear evento, reclamar, token) + `parseWith` + 11 escenarios Gherkin (RF-1) pasando
 ```
 
 - **Sorteo** (`packages/core/src/draw.ts`): puro, aleatoriedad inyectada (`secureRandomInt` para producción, `seededRandomInt` para pruebas). Baraja Fisher-Yates y descarta si alguien se toca a sí mismo. Valida 3–50 participantes y nombres únicos. Devuelve un tipo `Result`, no lanza excepciones.
@@ -56,21 +57,21 @@ Si la sesión nueva no tiene `/opt/node26`, instalar Node 26 (LTS) desde nodejs.
 
 ## 6. Trampas y hallazgos (para no repetirlos)
 
-1. **Typia 15 + esbuild**: `unplugin-typia` NO funciona. Se usa `ttsc` + `@ttsc/unplugin/esbuild` (ver `apps/api/build.mjs`). La primera compilación genera un binario en Go y tarda varios minutos (necesita Go y red); luego ~2 s. Usar `ttsc`/`ttsx`, nunca `tsc`/`tsx`, para ejecutar el transformador. La caché `.ttsc/` está en `.gitignore`.
-2. **TypeScript**: `apps/api` usa TS 7 (lo requiere `ttsc`); `apps/web` usa **TS 6** porque `astro check` no soporta TS 7.
+1. **Validación con Zod Mini**: solo `zod/mini`. Biome bloquea `zod`, `zod/v4` y `zod/v3` (`noRestrictedImports` en `biome.json`). Los esquemas viven en `packages/contract`. En `zod/mini` los límites van en `.check(z.minLength(..), z.trim(), ...)`, no como métodos encadenados.
+2. **TypeScript**: `apps/api`, `core` y `contract` usan TS 7; `apps/web` usa **TS 6** porque `astro check` no soporta TS 7.
 3. **Starwind**: su código no cumple `exactOptionalPropertyTypes`, por eso `apps/web` lo desactiva; y su código vendorizado está excluido de Biome. Biome tiene falsos positivos de "import sin usar" en `.astro` (desactivados solo para esos archivos).
 4. **pnpm 12** bloquea scripts de instalación: solo `esbuild` está aprobado en `allowBuilds`. pnpm añadió solo una excepción de antigüedad mínima para `@cloudflare/workers-types` (publicado el mismo día); es solo tipos, riesgo bajo.
 5. **Biome no formatea Markdown** (excluido a propósito para no reescribir los documentos).
 6. **Cuidado al encadenar comandos con `| tail`**: oculta el código de salida y puede dejar pasar errores de Biome. Usar `pnpm verify` y mirar su código de salida.
 7. La plantilla oficial de Astro y otras descargas de GitHub pueden fallar por la red; el proyecto web se creó a mano.
-8. Typia con strings: las restricciones (`tags.MinLength`, etc.) van en los tipos; el validador se genera en el build (`typia.createValidate<T>()`).
+8. Los errores de validación de Zod se convierten en `{ path, message }`; `path` usa puntos (p. ej. `participants.2`).
 
 ## 7. Qué sigue (en este orden sugerido)
 
-1. **API** (`apps/api`): rutas Hono de `AGENTS.md §6` —crear evento (sortea con `@secret-friend/core`), datos públicos, reclamar nombre, resultado propio—. Validar entradas con Typia; tokens aleatorios, guardar solo su hash SHA-256. Instalar `wrangler` para probar contra D1 local y escribir escenarios Gherkin de la API (RF-1 a RF-6, RF-9). Conectar `packages/core` como dependencia del workspace.
+1. **API** (`apps/api`): rutas Hono de `AGENTS.md §6` —crear evento (sortea con `@secret-friend/core`), datos públicos, reclamar nombre, resultado propio—. Validar entradas con `parseWith` de `@secret-friend/contract`; tokens aleatorios, guardar solo su hash SHA-256. Instalar `wrangler` para probar contra D1 local y escribir escenarios Gherkin de la API (RF-1 a RF-6, RF-9). Conectar `packages/core` y `packages/contract` como dependencias del workspace de `apps/api`.
 2. **Crear la base D1 en Cloudflare** y reemplazar el marcador `database_id` en `apps/api/wrangler.jsonc`. Aplicar `migrations/0000_init.sql`.
 3. **UI** (`apps/web`): pantallas del PRD §7 —crear evento, evento creado (compartir enlace), elegir nombre, ruleta, resultado, errores—. Página única `/e?t=<token>`. Ruleta como custom element: swipe hacia abajo + botón "Girar" accesible, respeta `prefers-reduced-motion`, confeti (`canvas-confetti` u otra ligera), vibración corta.
-4. **CI**: workflow de GitHub Actions que ejecute `pnpm verify` en cada push a `main` (propuesto, no pedido todavía). Considerar el costo de la primera compilación de `ttsc` (necesita Go) en CI.
+4. **CI**: ya existe `.github/workflows/ci.yml` (push a `main` y ejecución manual: `pnpm verify` con Node de `.nvmrc` y pnpm de `packageManager`). El CI no necesita caché especial (el build es esbuild a secas). Comprobar que la última ejecución en GitHub Actions esté en verde; las versiones de `actions/setup-node@v6` y `actions/cache` no se confirmaron en una fuente oficial (ya no se usa `cache`).
 5. **Despliegue** en Cloudflare (Workers Builds o `wrangler deploy`), comprobando que `run_worker_first` solo cubre `/api/*`.
 6. Skills de UX: la búsqueda inicial en la cuenta no encontró resultados; reintentar o diseñar a mano.
 

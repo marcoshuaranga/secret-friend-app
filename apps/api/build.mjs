@@ -1,4 +1,3 @@
-import ttsc from "@ttsc/unplugin/esbuild";
 import { build } from "esbuild";
 
 const entry = process.argv[2] ?? "src/index.ts";
@@ -11,5 +10,5 @@ await build({
   format: "esm",
   platform: "neutral",
   target: "es2022",
-  plugins: [ttsc()],
+  minify: false,
 });
