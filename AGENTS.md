@@ -4,7 +4,7 @@ Guía técnica y lineamientos para quien programe en este repositorio (personas 
 El **qué** y el **por qué** viven en [`PRD.md`](./PRD.md); aquí vive el **cómo**.
 Si algo contradice al PRD en lo funcional, gana el PRD.
 
-> Los puntos marcados con **[Supuesto]** no fueron confirmados y deben validarse.
+> Las decisiones están cerradas; el detalle por fases está en [`PLAN.md`](./PLAN.md).
 
 ## 1. Restricción principal: costo cero
 
@@ -22,8 +22,8 @@ Límites relevantes del plan gratuito de Cloudflare (verificados por búsqueda; 
 | D1, almacenamiento | 500 MB por base de datos, 5 GB por cuenta |
 
 Consecuencias de diseño:
-- Hashes **rápidos (SHA-256)** para tokens aleatorios largos; nada de bcrypt/argon2 (riesgo de pasar los 10 ms de CPU).
-- **Pocos índices**: basta el `token` del evento y las claves foráneas necesarias.
+- Hashes **rápidos (SHA-256)** para tokens aleatorios largos; nada de bcrypt/argon2 (riesgo de pasar los 10 ms de CPU). La contraseña del organizador usa PBKDF2-SHA256 de WebCrypto con iteraciones calibradas (< 5 ms de CPU) más límite de intentos.
+- **Pocos índices**: solo los de la sección 5.
 - El frontend es estático para no consumir solicitudes del Worker al abrir páginas.
 
 ## 2. Arquitectura
@@ -80,7 +80,7 @@ packages/
 
 ### Pruebas (BDD)
 - **Cucumber** con Gherkin; los escenarios viven en archivos `.feature` y describen comportamiento (crear evento, elegir nombre, girar la ruleta, nadie se toca a sí mismo).
-- **[Supuesto]** Escenarios de UI con Playwright; escenarios de sorteo y API directamente contra la app Hono, sin navegador.
+- Escenarios de UI con Playwright; escenarios de sorteo y API directamente contra la app Hono, sin navegador.
 - Todo cambio de comportamiento parte de un escenario Gherkin que referencie el requisito del PRD (RF-n).
 
 ## 4. Lineamientos de código
@@ -96,34 +96,45 @@ packages/
 
 ## 5. Modelo de datos
 
-- `events(id, token, admin_token_hash, name, date, budget, created_at, expires_at)`
-- `participants(id, event_id, name, claimed_at, claim_token_hash, revealed_at)` (`revealed_at` llega en la migración `0001`)
-- `assignments(event_id, giver_id, receiver_id)`
+- `devices(id, token_hash, fingerprint, created_at)` · único `token_hash`, índice `fingerprint`
+- `events(id, token, name, date, budget, admin_password_hash, admin_password_salt, failed_logins, login_window_start, created_at, expires_at)` · único `token`
+- `event_admins(event_id, device_id)` · PK `(event_id, device_id)`, índice `device_id`
+- `participants(id, event_id, name, device_id, claimed_at, revealed_at)` · únicos `(event_id, name)` y `(device_id, event_id)`
+- `assignments(event_id, giver_id, receiver_id)` · PK `(event_id, giver_id)`
 
-Tokens: aleatorios criptográficamente (256 bits, base64url), inadivinables; en base de datos solo se guarda su hash (SHA-256). La clave de administración se valida buscando el evento por su `token` y comparando hashes en tiempo constante, sin índice adicional.
+Tokens: aleatorios criptográficamente (256 bits, base64url), inadivinables; en base de datos solo se guarda su hash SHA-256. Como no existe ninguna base real todavía, la migración `0000_init.sql` se regenera en lugar de añadir una incremental.
 
-### Identidad del dispositivo ("huella")
+### Identidad híbrida
 
-No hay sesiones de usuario: el dispositivo es la sesión (RF-6). La huella es un **token aleatorio de dispositivo** emitido por la API al reclamar un nombre, **no** un *fingerprint* del navegador. El *fingerprinting* está descartado: dos teléfonos iguales producen la misma huella (sobre todo en Safari), lo que permitiría ver el resultado de otro, y además cambia con actualizaciones del navegador.
+No hay sesiones de usuario: el dispositivo es la cuenta (RF-6, RF-20).
 
-- Se entrega como cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/events/<token>`, con vencimiento igual al del evento.
-- `localStorage` guarda solo estado de la interfaz (participante elegido por evento, si ya giró y la clave de administración del organizador). Envolver todo acceso en `try/catch`; nunca es fuente de verdad.
-- La clave de administración viaja en el fragmento de la URL (`/admin#<token>.<clave>`) y se envía a la API en `Authorization: Bearer`, para que no aparezca en registros ni en `Referer`.
+- **ID del dispositivo**: token aleatorio emitido por la API en la cookie `sf_device` (`HttpOnly; Secure; SameSite=Strict; Path=/api; Max-Age=400 días`). Es lo único que identifica a participantes y administradores.
+- ***Fingerprint***: huella propia del navegador (sin librerías; FingerprintJS v4+ no tiene licencia de código abierto), reducida con SHA-256 en `apps/web/src/lib/fingerprint.ts`. **Nunca autoriza**: solo sugiere eventos al organizador que perdió su cookie (RF-21), mostrando nombre y fecha. Dos teléfonos iguales pueden coincidir, por eso no se usa para participantes.
+- **Contraseña del organizador**: autoriza a un dispositivo nuevo como administrador (`event_admins`). PBKDF2-SHA256 con sal, comparación en tiempo constante, 5 intentos fallidos por hora por evento.
+- `localStorage` solo guarda conveniencias de interfaz; envolver todo acceso en `try/catch`.
 
 ## 6. API
 
 | Método | Ruta | Auth | Función |
 |---|---|---|---|
-| POST | `/api/events` | — | Crea el evento y sortea. Devuelve el token del evento y la clave de administración. |
-| GET | `/api/events/:token` | — | Datos públicos: nombre, fecha, presupuesto, participantes y cuáles están tomados; `me` si la cookie corresponde. |
-| POST | `/api/events/:token/claim` | — | Reclama un nombre y emite la cookie del dispositivo. |
-| GET | `/api/events/:token/result` | cookie | Solo la asignación del participante identificado; la primera vez marca `revealed_at`. |
-| GET | `/api/events/:token/admin` | admin | Estado de los participantes (eligió, vio resultado), sin asignaciones. |
+| POST | `/api/events` | dispositivo | Crea el evento y sortea; el dispositivo queda como admin. |
+| GET | `/api/events/:token` | — | Datos públicos y participantes tomados; `me` e `isAdmin` según la cookie. |
+| POST | `/api/events/:token/claim` | dispositivo | Reclama un nombre. |
+| GET | `/api/events/:token/result` | dispositivo | Solo la asignación propia; la primera vez marca `revealed_at`. |
+| GET | `/api/me/events` | dispositivo | Mis eventos: creados y unidos. |
+| POST | `/api/recovery` | — | Eventos sugeridos por huella (solo `id`, `name`, `date`). |
+| POST | `/api/admin/login` | dispositivo | Contraseña del organizador; suma el dispositivo como admin. |
+| GET | `/api/events/:token/admin` | admin | Estado de los participantes, sin asignaciones. |
 | DELETE | `/api/events/:token/participants/:id/claim` | admin | Libera un nombre. |
 | PATCH | `/api/events/:token` | admin | Edita nombre, fecha y presupuesto. |
 | DELETE | `/api/events/:token` | admin | Elimina el evento en cascada. |
 
-Errores como `{ error: "<CODIGO>" }` (`INVALID_INPUT`, que además incluye `issues: [{ path, message }]` de `parseWith`, `NOT_FOUND`, `NAME_TAKEN`, `NOT_CLAIMED`, `UNAUTHORIZED`). Un evento vencido responde `NOT_FOUND`. Todo `/api/*` lleva `Cache-Control: no-store`. El detalle y el orden de construcción están en [`PLAN.md`](./PLAN.md).
+Errores como `{ error: "<CODIGO>" }`: `INVALID_INPUT` (con `issues: [{ path, message }]` de `parseWith`), `NOT_FOUND` (también vencido), `NAME_TAKEN`, `ALREADY_CLAIMED`, `NOT_CLAIMED`, `UNAUTHORIZED`, `TOO_MANY_ATTEMPTS`. Todo `/api/*` lleva `Cache-Control: no-store`. El detalle está en [`PLAN.md`](./PLAN.md).
+
+### Despliegue
+
+- Workflow manual `.github/workflows/deploy.yml` (`workflow_dispatch`): `pnpm verify`, sustituye el `database_id` desde la variable `D1_DATABASE_ID`, aplica migraciones remotas y ejecuta `wrangler deploy`. Usa los *secrets* `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`, configurados por el usuario en GitHub. El repositorio no guarda identificadores de la cuenta.
+- Dominio: `*.workers.dev`. Un Cron Trigger diario borra eventos vencidos y dispositivos sin eventos.
 
 ## 7. Sorteo y ruleta
 

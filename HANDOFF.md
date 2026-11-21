@@ -28,7 +28,7 @@ Amigo secreto web *mobile first*. Un enlace por evento; cada persona elige su no
 | Flujo | Trunk-based; ejecutar `pnpm verify` antes de cada push |
 | Idioma | Producto en español |
 
-Decisiones de producto aún **no confirmadas** (marcadas **[Supuesto]** en el PRD): nombre ya elegido queda bloqueado para otros dispositivos (RF-5), liberación por el organizador con clave de administración, expiración a 90 días, i18n futura.
+Todas las decisiones de producto están confirmadas; el resumen está en `PLAN.md` ("Decisiones cerradas").
 
 ## 4. Qué hay construido
 
@@ -70,11 +70,9 @@ Si la sesión nueva no tiene `/opt/node26`, instalar Node 26 (LTS) desde nodejs.
 
 El plan completo de v1, por fases y con criterios de terminado, está en [`PLAN.md`](./PLAN.md). La fase 0 ya tiene el CI hecho; seguir con las fundaciones de la API (core y contract como dependencias, wrangler y pruebas) y luego la fase 1.
 
-## 8. Decisiones del 2026-11-21 y preguntas abiertas
+## 8. Decisiones del 2026-11-21
 
-- Confirmado: panel del organizador (RF-16 a RF-19), ruleta repetible con estilo casino (RF-14, RF-15) y el dispositivo como identidad (RF-6), implementado con un token aleatorio y no con *fingerprinting* del navegador (motivo en `AGENTS.md §5`).
-- Abierta: exclusiones de parejas en v1 (propuesta: v2).
-- CI con GitHub Actions: ya existe (`.github/workflows/ci.yml`).
+No quedan preguntas abiertas. Resumen en `PLAN.md` ("Decisiones cerradas"): panel del organizador, ruleta repetible estilo casino, estilo neutro y moderno, identidad híbrida (ID aleatorio del dispositivo + *fingerprint* solo como pista + contraseña del organizador), 90 días, i18n preparada, Playwright, despliegue manual con GitHub Actions, exclusiones en v2.
 
 ## 9. Notas sobre cómo trabaja el usuario
 

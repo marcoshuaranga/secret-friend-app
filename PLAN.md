@@ -4,133 +4,157 @@ Plan de construcción de la aplicación completa. El **qué** está en [`PRD.md`
 
 > Todo se trabaja en `main` (trunk-based). Cada tarea termina con `pnpm verify` en verde y un commit pequeño. Las fases se entregan en orden porque cada una se apoya en la anterior. Dentro de una fase, primero el escenario Gherkin y después el código.
 
-## Decisiones que guían el plan (confirmadas el 2026-11-21)
+## Decisiones cerradas (2026-11-21)
 
-1. **El organizador administra el evento** desde un panel propio: ve quién ya eligió nombre y quién ya vio su resultado (nunca las asignaciones), libera nombres, edita los datos del evento y lo elimina.
-2. **La ruleta se gira todas las veces que se quiera**, con una puesta en escena de casino. El resultado es siempre el mismo porque viene del servidor (RF-9 y RF-13 no cambian).
-3. **El dispositivo es la sesión.** No hay cuentas, así que la identidad es una **huella del dispositivo**: un token aleatorio que el servidor entrega al elegir el nombre, que se guarda en el navegador y que se envía en cada solicitud. Ver la decisión técnica abajo.
+No quedan preguntas abiertas. Cualquier cambio sobre esto se registra primero en el PRD o en AGENTS.
 
-### Huella del dispositivo: token aleatorio, no *fingerprinting* del navegador
+| Tema | Decisión |
+|---|---|
+| Administración | El organizador tiene un panel: estado de cada participante (nunca asignaciones), liberar nombres, editar y eliminar el evento |
+| Ruleta | Se gira sin límite, siempre cae en el mismo resultado; puesta en escena de casino **solo en la pantalla de la ruleta** |
+| Estilo visual | **Neutro y moderno** en el resto de la app: claro, minimalista, acentos de color, modo oscuro |
+| Identidad | **Híbrida**: ID aleatorio del dispositivo como "cuenta" + *fingerprint* del navegador solo como pista de recuperación (detalle abajo) |
+| Recuperar la administración | Contraseña del organizador, definida al crear el evento |
+| Vencimiento | 90 días; el evento y sus datos se borran |
+| Idioma | Solo español en v1, con los textos centralizados para traducir después |
+| Pruebas | Cucumber para núcleo y API; Playwright para la UI |
+| Despliegue | Workflow **manual** de GitHub Actions (`workflow_dispatch`) que aplica migraciones y ejecuta `wrangler deploy` |
+| Dominio | `*.workers.dev` gratuito |
+| Exclusiones de parejas | v2 |
 
-La huella se implementa como un **token aleatorio de dispositivo** (256 bits) y no como un *fingerprint* calculado a partir del navegador (canvas, fuentes, user agent, etc.). Razones:
+### Identidad híbrida
 
-- **Privacidad (bloqueante)**: dos teléfonos del mismo modelo y versión dan la misma huella. Safari reduce a propósito la información que expone, así que dos iPhone iguales del mismo grupo serían indistinguibles y uno podría ver el resultado del otro. Eso rompe el requisito de privacidad del PRD.
-- **Estabilidad**: la huella del navegador cambia con actualizaciones, modo oscuro o zoom, y la persona perdería su identidad sin haber hecho nada.
-- **Costo y simplicidad**: un token aleatorio no necesita librerías ni cálculo, y su hash SHA-256 cabe sin problema en los 10 ms de CPU.
+**1. ID del dispositivo (la "cuenta").** La primera vez que un dispositivo crea un evento, elige un nombre o inicia sesión como organizador, la API genera un token aleatorio de 256 bits y lo entrega en la cookie `sf_device` (`HttpOnly; Secure; SameSite=Strict; Path=/api; Max-Age=400 días`). En D1 solo se guarda su hash SHA-256. Ese ID:
 
-Cómo se guarda:
+- identifica al participante para ver su resultado (RF-6);
+- identifica al organizador para entrar al panel sin enlaces especiales;
+- alimenta **"Mis eventos"** en el inicio: los eventos que creé y en los que elegí nombre en este dispositivo.
 
-- **Cookie `HttpOnly`, `Secure`, `SameSite=Strict`** emitida por la API, con `Path=/api/events/<token>`: queda limitada a ese evento, el JavaScript no la puede leer y no se envía a otros eventos. Safari no aplica a las cookies del servidor el límite de 7 días que sí aplica al almacenamiento escrito por scripts.
-- **`localStorage`** guarda solo datos para la interfaz: qué participante soy en cada evento, si ya vi la ruleta y la clave de administración si soy el organizador. Nunca es la fuente de verdad.
-- En la base de datos solo se guarda el **hash SHA-256** del token.
+**2. *Fingerprint* (solo pista).** El navegador calcula una huella propia, sin librerías (zona horaria, idiomas, pantalla, núcleos, memoria, puntos táctiles, *canvas* y renderizador WebGL), la reduce con SHA-256 y la envía al crear el dispositivo. Nunca autoriza nada por sí sola, porque dos teléfonos iguales pueden dar la misma huella. Solo sirve para que, si se borraron los datos o cambió de navegador en el mismo equipo, la app muestre **"¿Eres el organizador de alguno de estos eventos?"** con el nombre y la fecha de los eventos que coinciden.
 
-Limitación aceptada: si la persona abre el enlace en otro navegador (por ejemplo, el navegador interno de WhatsApp y luego Safari), cuenta como otro dispositivo. La pantalla de "nombre tomado" lo explica y propone pedir al organizador que libere el nombre. El navegador interno de WhatsApp en iOS puede borrar su almacenamiento al cerrarse, así que la pantalla del resultado sugiere abrir el enlace en el navegador del sistema.
+**3. Contraseña del organizador (lo que autoriza).** Para entrar al panel desde un dispositivo que no es el suyo (con o sin la pista del *fingerprint*, o desde el enlace del evento con "Soy el organizador"), se pide la contraseña elegida al crear el evento. Al acertar, ese dispositivo queda como administrador además del original. Mínimo 8 caracteres, PBKDF2-SHA256 con sal y **5 intentos fallidos por hora por evento**.
+
+**Participantes que pierden su identidad**: el nombre sigue tomado; el organizador lo libera desde el panel y la persona lo vuelve a elegir. El *fingerprint* no se usa para recuperar participantes, porque una coincidencia por error le mostraría a alguien el resultado de otro.
+
+**Datos que viajan a la interfaz**: `localStorage` solo guarda conveniencias (sonido activado, si ya giré en este evento). La identidad vive en la cookie, que el JavaScript no puede leer.
 
 ## Fase 0 — Fundaciones
 
 | # | Tarea | Listo cuando |
 |---|---|---|
 | 0.1 | Conectar `@secret-friend/core` y `@secret-friend/contract` como dependencias de workspace de `apps/api` | La API importa `draw` y `parseWith` y el build los empaqueta |
-| 0.2 | Instalar `wrangler` en `apps/api` y añadir los scripts `dev` (`wrangler dev`) y `db:migrate:local` | `pnpm --filter api dev` levanta el Worker con D1 local y sirve `apps/web/dist` |
-| 0.3 | ~~CI en GitHub Actions~~ **Hecho** (`.github/workflows/ci.yml`) | Confirmar que la última ejecución está en verde |
+| 0.2 | Instalar `wrangler` en `apps/api` y añadir los scripts `dev` (`wrangler dev`) y `db:migrate:local` | `pnpm --filter @secret-friend/api dev` levanta el Worker con D1 local y sirve `apps/web/dist` |
+| 0.3 | ~~CI en GitHub Actions~~ **Hecho** (`.github/workflows/ci.yml`) | La última ejecución está en verde |
 | 0.4 | Infraestructura de pruebas de la API: Cucumber ejecutando la app Hono con `app.request()` y un D1 local de `getPlatformProxy()` de wrangler | Un escenario de `GET /api/health` pasa |
+| 0.5 | Nuevo esquema de datos (abajo) y **regenerar `0000_init.sql`**: aún no existe ninguna base real, así que no hace falta migración incremental | `drizzle-kit generate` produce la migración y se aplica en local |
 
-## Fase 1 — Dominio puro (`packages/core`)
+## Fase 1 — Dominio puro (`packages/core` y `packages/contract`)
 
 Todo lo que es regla del negocio, sin E/S, probado con escenarios Gherkin y con aleatoriedad y reloj inyectados.
 
 | # | Tarea | RF |
 |---|---|---|
-| 1.1 | Validación de entrada: ya existe en `@secret-friend/contract` (recorte, largos, 3–50, únicos sin distinguir mayúsculas). Falta: que la unicidad ignore también tildes ("Ana" = "Aná"), añadir los esquemas de las rutas de administración y que la UI reutilice los mismos esquemas | RF-1 |
+| 1.1 | Validación de entrada (ya existe en `contract`). Falta: unicidad que ignore tildes ("Ana" = "Aná"), contraseña de 8–128 caracteres en `createEventSchema`, y esquemas de *login*, recuperación y edición | RF-1, RF-21 |
 | 1.2 | Ya existe: sorteo sin puntos fijos, uniforme | RF-11, RF-12 |
-| 1.3 | Reglas de reclamo como funciones puras: libre → tomado, tomado por mí → idempotente, tomado por otro → error `NAME_TAKEN` | RF-4, RF-5 |
+| 1.3 | Reglas de reclamo: libre → tomado; tomado por mí → idempotente; tomado por otro → `NAME_TAKEN`; un dispositivo solo puede tener un nombre por evento → `ALREADY_CLAIMED` | RF-4, RF-5, RF-6 |
 | 1.4 | Vencimiento: `expiresAt = createdAt + 90 días`; un evento vencido equivale a inexistente | PRD §6 |
-| 1.5 | Secuencia de la ruleta: dado el resultado, la lista de los demás y una semilla, genera la tira de nombres que pasa por la ruleta (sin el propio, con "casi aciertos" antes de detenerse en el resultado). Es pura, así que la UI solo anima | RF-8, RF-9 |
+| 1.5 | Bloqueo de *login*: dado el historial de fallos y el reloj, decide si se permite intentar (5 por hora) | RF-21 |
+| 1.6 | Secuencia de la ruleta: dado el resultado, los demás participantes y una semilla, genera la tira de nombres del carrete (sin el propio, con "casi aciertos" antes del resultado). Pura; la UI solo anima | RF-8, RF-9, RF-15 |
 
 ## Fase 2 — API (`apps/api`)
 
-Rutas Hono finas: validan en el borde con los esquemas Zod Mini de `@secret-friend/contract` (`parseWith`), llaman al núcleo y a un repositorio con currying (`crearRepo(db)`), y traducen los errores `Result` a HTTP. Tokens de 256 bits en base64url; en D1 solo sus hashes SHA-256.
+Rutas Hono finas: validan en el borde con `parseWith` de `contract`, llaman al núcleo y a un repositorio con currying (`crearRepo(db)`), y traducen los `Result` a HTTP. Un *middleware* `device` lee la cookie y, en las rutas que lo necesitan, crea el dispositivo si no existe.
 
-### Cambios de esquema (migración `0001`)
+### Esquema
 
-- `participants.revealed_at` (integer, nullable): primera vez que vio su resultado; alimenta el panel del organizador y la métrica del PRD.
-- Nada más. La clave de administración se busca por el token del evento y se compara contra su hash, sin índice nuevo.
+- `devices(id, token_hash, fingerprint, created_at)` · índice único `token_hash`, índice `fingerprint`
+- `events(id, token, name, date, budget, admin_password_hash, admin_password_salt, failed_logins, login_window_start, created_at, expires_at)` · índice único `token`
+- `event_admins(event_id, device_id)` · PK `(event_id, device_id)`, índice `device_id`
+- `participants(id, event_id, name, device_id, claimed_at, revealed_at)` · únicos `(event_id, name)` y `(device_id, event_id)`
+- `assignments(event_id, giver_id, receiver_id)` · PK `(event_id, giver_id)`
+
+Escrituras al crear un evento de *n* personas: unas 4 + 5·*n* contando índices (≈ 54 para 10 personas), lejos del límite diario de 100.000.
 
 ### Rutas
 
 | Método | Ruta | Auth | Función | RF |
 |---|---|---|---|---|
-| POST | `/api/events` | — | Valida, sortea, guarda en un `batch` de D1. Devuelve `eventToken` y `adminKey` (una única vez) | RF-1, RF-2, RF-13 |
-| GET | `/api/events/:token` | — | Nombre, fecha, presupuesto y participantes con `id`, `name`, `taken`. Si la cookie corresponde, `me` | RF-4, RF-5 |
-| POST | `/api/events/:token/claim` | — | `{ participantId }`. Emite la cookie del dispositivo. 409 si otro dispositivo ya lo tiene | RF-4, RF-5, RF-6 |
-| GET | `/api/events/:token/result` | cookie | Solo el nombre de mi amigo secreto. La primera vez marca `revealed_at` | RF-8, RF-9 |
-| GET | `/api/events/:token/admin` | `Authorization: Bearer <adminKey>` | Participantes con `claimed` y `revealed`, sin asignaciones | Admin |
-| DELETE | `/api/events/:token/participants/:id/claim` | admin | Libera el nombre: borra el hash del reclamo y `revealed_at` | Admin |
-| PATCH | `/api/events/:token` | admin | Edita nombre, fecha y presupuesto. Los participantes no se editan: cambiarlos rompería el sorteo | Admin |
-| DELETE | `/api/events/:token` | admin | Borra el evento y todo en cascada | Admin |
+| POST | `/api/events` | dispositivo (se crea) | Valida, sortea y guarda en un `batch`; el dispositivo queda como admin. Devuelve `token` | RF-1, RF-2, RF-13, RF-16 |
+| GET | `/api/events/:token` | — | Nombre, fecha, presupuesto, participantes (`id`, `name`, `taken`); `me` e `isAdmin` según la cookie | RF-4, RF-5 |
+| POST | `/api/events/:token/claim` | dispositivo (se crea) | `{ participantId }`. 409 `NAME_TAKEN` / `ALREADY_CLAIMED` | RF-4, RF-5, RF-6 |
+| GET | `/api/events/:token/result` | dispositivo | Solo el nombre de mi amigo secreto; la primera vez marca `revealed_at` | RF-8, RF-9 |
+| GET | `/api/me/events` | dispositivo | "Mis eventos": creados y unidos, con su enlace | RF-20 |
+| POST | `/api/recovery` | — | `{ fingerprint }` → eventos vigentes administrados por dispositivos con esa huella: solo `id`, `name`, `date` | RF-21 |
+| POST | `/api/admin/login` | dispositivo (se crea) | `{ eventId, password }`. Si acierta, suma este dispositivo a `event_admins`. 429 si está bloqueado | RF-21 |
+| GET | `/api/events/:token/admin` | admin | Participantes con `claimed` y `revealed`, sin asignaciones | RF-17 |
+| DELETE | `/api/events/:token/participants/:id/claim` | admin | Libera el nombre (`device_id`, `claimed_at` y `revealed_at` a nulo) | RF-18 |
+| PATCH | `/api/events/:token` | admin | Edita nombre, fecha y presupuesto | RF-19 |
+| DELETE | `/api/events/:token` | admin | Borra el evento en cascada | RF-19 |
 
-Respuestas de error uniformes `{ error: "<CODIGO>" }` (con `issues: [{ path, message }]` de `parseWith` cuando es `INVALID_INPUT`): `INVALID_INPUT`, `NOT_FOUND` (también si venció), `NAME_TAKEN`, `NOT_CLAIMED`, `UNAUTHORIZED`. Comparaciones de hashes en tiempo constante. `Cache-Control: no-store` en todo `/api/*`.
+Errores `{ error: "<CODIGO>" }`: `INVALID_INPUT` (con `issues`), `NOT_FOUND` (también vencido), `NAME_TAKEN`, `ALREADY_CLAIMED`, `NOT_CLAIMED`, `UNAUTHORIZED`, `TOO_MANY_ATTEMPTS`. Comparaciones en tiempo constante. `Cache-Control: no-store` en todo `/api/*`.
 
-### Escenarios Gherkin de la API
+### Escenarios Gherkin
 
-`crear-evento.feature`, `elegir-nombre.feature` (incluye "nombre tomado por otro dispositivo"), `ver-resultado.feature` (incluye "nadie ve el resultado de otro"), `administrar.feature`, `vencimiento.feature`.
+`crear-evento`, `elegir-nombre` (incluye "tomado por otro dispositivo" y "un nombre por dispositivo"), `ver-resultado` (incluye "nadie ve el resultado de otro"), `mis-eventos`, `administrar`, `recuperar-administracion` (huella coincidente sin contraseña no da acceso; bloqueo tras 5 fallos), `vencimiento`.
 
 ## Fase 3 — Interfaz base (`apps/web`)
 
-Astro estático, sin islas. Un cliente de API tipado (`src/lib/api.ts`) compartido por los `<script>`; textos en un único módulo `src/i18n/es.ts` para la i18n futura.
+Astro estático, sin islas. Cliente de API tipado (`src/lib/api.ts`), textos en `src/i18n/es.ts`, huella en `src/lib/fingerprint.ts`.
 
 | # | Pantalla | Ruta | Detalle |
 |---|---|---|---|
-| 3.1 | Layout y sistema visual | — | Tema festivo, tipografía, colores tokenizados, modo oscuro, 360–430 px primero. Añadir con Starwind lo que haga falta (`dialog`, `badge`, `alert`, `toast`) |
-| 3.2 | Crear evento | `/` | Formulario con lista dinámica de nombres (agregar con Enter, pegar varios separados por línea o coma, quitar), validación en vivo con las mismas reglas del núcleo |
-| 3.3 | Evento creado | `/` (estado tras crear) | Enlace para participantes con copiar y `navigator.share`; enlace de administración aparte con advertencia de guardarlo. La clave se guarda también en `localStorage` |
-| 3.4 | Elegir nombre | `/e?t=<token>` | Lista tocable libre/tomado, confirmación "¿Eres Ana?", y redirección a la ruleta si este dispositivo ya eligió |
-| 3.5 | Errores | `/e`, `/404` | Enlace inválido o vencido, nombre tomado (con la explicación de "otro navegador"), sin conexión |
+| 3.1 | Layout y sistema visual | — | Neutro y moderno: tokens de color, tipografía, modo oscuro, 360–430 px primero. Añadir con Starwind lo necesario (`dialog`, `badge`, `alert`, `toast`) |
+| 3.2 | Inicio: Mis eventos + crear | `/` | Lista de eventos del dispositivo; si no hay cookie, consulta la pista de recuperación |
+| 3.3 | Crear evento | `/nuevo` | Nombre, lista dinámica de nombres (Enter, pegar varios, quitar), fecha, presupuesto y contraseña del organizador. Validación en vivo con los esquemas de `contract` |
+| 3.4 | Evento creado | `/nuevo` (estado final) | Enlace para copiar y `navigator.share`; recordatorio de la contraseña |
+| 3.5 | Elegir nombre | `/e?t=<token>` | Lista libre/tomado, confirmación "¿Eres Ana?", redirección a la ruleta si ya elegí; acceso "Soy el organizador" |
+| 3.6 | Errores | `/e`, `/404` | Enlace inválido o vencido, nombre tomado (con la explicación de "otro navegador"), sin conexión |
 
 ## Fase 4 — Ruleta de casino
 
-Custom element `<sf-roulette>` con la secuencia de la fase 1.5. Sin dependencias salvo `canvas-confetti`.
+Custom element `<sf-roulette>` con la secuencia de la fase 1.6. Única dependencia: `canvas-confetti`.
 
-- **Gesto**: arrastrar hacia abajo como la palanca de una tragamonedas; la fuerza del swipe define la velocidad inicial. Botón "Girar" equivalente (RF-7).
-- **Movimiento**: carrete vertical con `transform` y `requestAnimationFrame`, desaceleración con curva de frenado, "casi aciertos" y un rebote final en el resultado.
-- **Puesta en escena**: luces de marquesina parpadeando alrededor del carrete, tic sonoro en cada nombre que pasa (Web Audio, **silenciado por defecto** con un botón para activarlo), vibración corta al detenerse, confeti y nombre destacado (RF-10).
-- **Repetir**: botón "Girar otra vez" ilimitado; siempre cae en el mismo nombre. El resultado se pide al servidor una sola vez y se reutiliza en cada giro.
-- **Revisitar** (paso 7 del PRD): si el dispositivo ya giró, se muestra directo el resultado con el botón para volver a girar.
+- **Gesto**: arrastrar hacia abajo como la palanca de una tragamonedas; la fuerza del swipe fija la velocidad inicial. Botón "Girar" equivalente (RF-7).
+- **Movimiento**: carrete vertical con `transform` y `requestAnimationFrame`, frenado progresivo, "casi aciertos" y rebote final.
+- **Puesta en escena** (solo en esta pantalla): luces de marquesina, tic sonoro por nombre (Web Audio, **apagado por defecto**), vibración corta, confeti y nombre destacado (RF-10, RF-15).
+- **Repetir**: "Girar otra vez" ilimitado; el resultado se pide al servidor una vez y se reutiliza (RF-14).
+- **Revisitar**: si ya giré, se muestra el resultado con el botón para volver a girar.
 - **Movimiento reducido**: sin carrete largo ni confeti; transición corta al resultado.
-- Pantalla de resultado con fecha y presupuesto, y "Agregar al calendario" (archivo `.ics` generado en el navegador) si hay fecha.
+- Resultado con fecha, presupuesto y "Agregar al calendario" (`.ics` generado en el navegador).
 
 ## Fase 5 — Panel del organizador
 
-- Ruta `/admin#<eventToken>.<adminKey>`: el fragmento `#` nunca llega al servidor ni a los registros; el script lo lee y lo envía en el encabezado `Authorization`.
+- Ruta `/admin?t=<token>`. Si el dispositivo no es admin, pide la contraseña.
 - Estado por participante: libre, eligió nombre, ya vio su resultado; progreso "5 de 8 ya vieron su amigo secreto".
-- Acciones: liberar nombre (con confirmación), editar nombre/fecha/presupuesto, volver a copiar los enlaces y eliminar el evento (confirmación escribiendo el nombre).
-- Si el organizador abre el enlace del evento en el dispositivo donde lo creó, ve un acceso al panel.
+- Acciones: liberar nombre (con confirmación), editar nombre/fecha/presupuesto, copiar el enlace y eliminar el evento (confirmación escribiendo el nombre).
 
 ## Fase 6 — Despliegue y operación
 
-| # | Tarea |
-|---|---|
-| 6.1 | Crear la base D1 de producción, reemplazar `database_id`, aplicar las migraciones |
-| 6.2 | Primer `wrangler deploy` y comprobar que solo `/api/*` despierta al Worker (las páginas no deben contar solicitudes) |
-| 6.3 | Despliegue continuo desde `main` (Workers Builds o un paso de CI con un token de API de Cloudflare guardado como secreto) |
-| 6.4 | Limpieza de eventos vencidos con un Cron Trigger diario (incluido en el plan gratuito) |
-| 6.5 | Encabezados de seguridad para los estáticos con `_headers`: CSP sin scripts externos, `Referrer-Policy: no-referrer`, `X-Content-Type-Options` |
+| # | Tarea | Quién |
+|---|---|---|
+| 6.1 | Crear la base D1 `secret-friend` en el panel de Cloudflare y guardar en GitHub: *secrets* `CLOUDFLARE_API_TOKEN` (permisos Workers Scripts y D1: edición) y `CLOUDFLARE_ACCOUNT_ID`; *variable* `D1_DATABASE_ID` | Usuario, con pasos que dejo escritos en `docs/despliegue.md` |
+| 6.2 | Workflow manual `.github/workflows/deploy.yml` (`workflow_dispatch`): `pnpm verify`, sustituye `database_id`, `wrangler d1 migrations apply DB --remote`, `wrangler deploy` | Agente |
+| 6.3 | Primer despliegue y comprobación de que solo `/api/*` despierta al Worker | Usuario lanza, agente verifica |
+| 6.4 | Cron Trigger diario: borra eventos vencidos y dispositivos sin eventos | Agente |
+| 6.5 | `_headers` para los estáticos: CSP sin scripts externos, `Referrer-Policy: no-referrer`, `X-Content-Type-Options` | Agente |
 
 ## Fase 7 — Calidad y cierre de v1
 
-- Escenarios de UI con Playwright para el recorrido completo: crear, compartir, elegir nombre en dos "dispositivos" (contextos distintos), girar, revisitar, liberar desde el panel.
-- Revisión de accesibilidad: foco visible, etiquetas, contraste, lectores de pantalla en la ruleta (anunciar el resultado con `aria-live`).
-- Presupuesto de rendimiento: < 2 s en 4G simulado, JS por página < 30 KB comprimido.
-- Prueba real con un grupo de amigos antes de darla por terminada.
+- Escenarios de UI con Playwright: crear, compartir, elegir nombre en dos contextos de navegador, girar varias veces, revisitar, liberar desde el panel, recuperar la administración con contraseña.
+- Accesibilidad: foco visible, etiquetas, contraste, resultado anunciado con `aria-live`.
+- Rendimiento: < 2 s en 4G simulado, JS por página < 30 KB comprimido.
+- Prueba real con un grupo de amigos.
 
 ## Riesgos
 
 | Riesgo | Mitigación |
 |---|---|
 | Alguien elige un nombre que no es el suyo | Confirmación "¿Eres Ana?" y liberación desde el panel |
-| Se pierde la identidad del dispositivo (otro navegador, datos borrados) | Mensaje claro y liberación por el organizador |
-| El organizador pierde el enlace de administración | Se guarda también en `localStorage` del dispositivo creador; se advierte al crearlo. Sin cuentas no hay recuperación posible |
-| Superar límites del plan gratuito | Estáticos fuera del Worker, pocas escrituras por evento (unas 2 + 4 por participante, contando índices), CPU baja por SHA-256 |
+| Se pierde la cookie (otro navegador, datos borrados) | Participante: liberación por el organizador. Organizador: pista por huella + contraseña |
+| Dos dispositivos con la misma huella | La huella solo muestra nombre y fecha de eventos; entrar exige contraseña |
+| Ataque a la contraseña | 5 intentos por hora por evento, PBKDF2 con sal |
+| CPU de PBKDF2 en el plan gratuito (10 ms) | Iteraciones calibradas midiendo en el Worker (objetivo < 5 ms); el límite de intentos compensa |
+| Superar límites del plan gratuito | Estáticos fuera del Worker y pocas escrituras por evento |
 
 ## Fuera de v1
 
