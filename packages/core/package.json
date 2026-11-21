@@ -7,11 +7,12 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "cucumber-js"
+    "test": "vitest run"
   },
   "devDependencies": {
-    "@cucumber/cucumber": "^13.3.0",
+    "@amiceli/vitest-cucumber": "^8.0.1",
     "@types/node": "^26.6.6",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
   }
 }

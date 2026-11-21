@@ -1,43 +1,50 @@
-# language: es
-Característica: Sorteo del amigo secreto
-  Cubre RF-11 (nadie se toca a sí mismo), RF-12 (reparto justo) y RF-13 (el sorteo se genera una vez).
+@domain
+Feature: Draw the secret friends
+  As a group of friends
+  We want a draw where nobody gets themselves and every valid outcome is equally likely
+  So that the secret friend exchange is valid and fair
 
-  Esquema del escenario: Nadie se toca a sí mismo
-    Dado un grupo de <cantidad> participantes
-    Cuando se realiza el sorteo
-    Entonces el sorteo es válido
-    Y ningún participante se toca a sí mismo
-    Y cada participante regala a una persona y recibe de otra
+  @RF-11 @RF-12
+  Scenario Outline: Nobody draws themselves
+    Given a group of <count> participants
+    When the draw is made
+    Then the draw is valid
+    And no participant draws themselves
+    And every participant gives to one person and receives from another
 
-    Ejemplos:
-      | cantidad |
-      | 3        |
-      | 4        |
-      | 10       |
-      | 50       |
+    Examples:
+      | count |
+      | 3     |
+      | 4     |
+      | 10    |
+      | 50    |
 
-  Escenario: El sorteo se puede repetir con la misma semilla
-    Dado un grupo de 8 participantes
-    Cuando se realiza el sorteo dos veces con la misma semilla
-    Entonces ambos sorteos son idénticos
+  @RF-13
+  Scenario: The same seed always produces the same draw
+    Given a group of 8 participants
+    When the draw is made twice with the same seed
+    Then both draws are identical
 
-  Escenario: Todos los repartos válidos son igual de probables
-    Dado un grupo de 4 participantes
-    Cuando se realizan 9000 sorteos con semillas distintas
-    Entonces aparecen los 9 repartos posibles
-    Y cada reparto aparece cerca de 1000 veces
+  @RF-12
+  Scenario: Every valid outcome is equally likely
+    Given a group of 4 participants
+    When 9000 draws are made with different seeds
+    Then all 9 possible outcomes appear
+    And each outcome appears about 1000 times
 
-  Esquema del escenario: Se rechaza un grupo inválido
-    Dado un grupo de <cantidad> participantes
-    Cuando se realiza el sorteo
-    Entonces el sorteo falla con el error "<error>"
+  @RF-1
+  Scenario Outline: An invalid group size is rejected
+    Given a group of <count> participants
+    When the draw is made
+    Then the draw fails with the error "<error>"
 
-    Ejemplos:
-      | cantidad | error                  |
-      | 2        | too_few_participants   |
-      | 51       | too_many_participants  |
+    Examples:
+      | count | error                 |
+      | 2     | too_few_participants  |
+      | 51    | too_many_participants |
 
-  Escenario: Se rechazan nombres repetidos
-    Dado los participantes "Ana, Beto, Ana"
-    Cuando se realiza el sorteo
-    Entonces el sorteo falla con el error "duplicate_participants"
+  @RF-1
+  Scenario: Repeated names are rejected
+    Given the participants "Ana, Beto, Ana"
+    When the draw is made
+    Then the draw fails with the error "duplicate_participants"

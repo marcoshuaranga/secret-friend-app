@@ -42,12 +42,13 @@ apps/
   api/   Worker con Hono, Drizzle y Typia (build con esbuild + ttsc)
   web/   Astro estático (todo .astro, sin frameworks de UI) + Tailwind + Starwind UI
 packages/
-  core/  núcleo puro del dominio (sorteo) + escenarios Gherkin (`features/`)
+  core/  núcleo puro del dominio (sorteo) + escenario Gherkin de dominio (`features/`)
+e2e/     escenarios Gherkin end to end (`features/`) + arnés Vitest/Playwright (`support/`, `specs/`)
 ```
 
 - `packages/core`: TypeScript puro, sin dependencias de runtime. Se ejecuta directamente con Node 26 (type stripping; imports relativos con extensión `.ts`, sin `enum` ni parameter properties). El Worker lo consumirá como dependencia del workspace.
 - `apps/api/migrations`: migraciones SQL generadas con `drizzle-kit generate`; `apps/api/wrangler.jsonc` define el Worker, los assets (`../web/dist`, con `run_worker_first` solo para `/api/*`) y el binding D1 `DB`. El `database_id` es un marcador: reemplazar al crear la base de datos.
-- Pruebas: `pnpm test` (Cucumber). Estado: sorteo cubierto (RF-11, RF-12); faltan escenarios de la API y de la UI.
+- Pruebas: `pnpm test` (Vitest en todos los paquetes). Estado: sorteo de dominio cubierto (RF-11, RF-12, RF-13); los escenarios end to end de `e2e/features` están escritos y validados por convención, pero sus pasos se implementan junto con cada funcionalidad.
 
 - **pnpm workspaces** (`apps/*`, `packages/*`). Los scripts de la raíz (`build`, `typecheck`, `check`) recorren todos los paquetes.
 - **Biome** vive en la raíz y cubre todo el repo (excepto Markdown, que se edita a mano).
@@ -76,9 +77,14 @@ packages/
 - **Biome** para lint y formato.
 - Animación de la ruleta en CSS/JS propio; confeti con una librería ligera (p. ej. `canvas-confetti`).
 
-### Pruebas (BDD)
-- **Cucumber** con Gherkin; los escenarios viven en archivos `.feature` y describen comportamiento (crear evento, elegir nombre, girar la ruleta, nadie se toca a sí mismo).
-- **[Supuesto]** Escenarios de UI con Playwright; escenarios de sorteo y API directamente contra la app Hono, sin navegador.
+### Pruebas (BDD, end to end)
+- **Gherkin en inglés** (archivos `.feature`), ejecutado con **Vitest** + **`@amiceli/vitest-cucumber`**: cada `.feature` tiene un `*.spec.ts` que lo carga con `loadFeature` y lo implementa con `describeFeature`; la librería falla si falta un escenario o un paso, así que un feature está "hecho" cuando su spec pasa completo.
+- **End to end con Playwright**: la validación se hace contra la app desplegada localmente (Worker + assets, p. ej. `wrangler dev`), nunca contra funciones internas. URL en `E2E_BASE_URL` (por defecto `http://localhost:8787`); si la versión de Playwright no coincide con el Chromium instalado, usar `E2E_CHROMIUM_PATH`.
+  - `@ui`: navegador Chromium con viewport de móvil (`support/devices.ts`). **Cada persona del escenario es un dispositivo**: un `BrowserContext` aislado (almacenamiento propio), lo que permite probar "otro dispositivo", identidad recordada, movimiento reducido, `navigator.share` y `navigator.vibrate`.
+  - `@api`: `APIRequestContext` de Playwright contra el mismo Worker (privacidad, concurrencia de reclamos, integridad del sorteo).
+- **Etiquetas obligatorias** (las valida `e2e/specs/feature-conventions.spec.ts`): al menos un requisito (`@RF-n`, `@privacy`, `@a11y` o `@assumption`) y exactamente una capa (`@ui` o `@api`). Otras: `@smoke` (camino feliz mínimo). `@assumption` marca lo que depende de un **[Supuesto]** del PRD.
+- **Estilo Gherkin**: declarativo (comportamiento, no clics ni selectores), presente y tercera persona, un comportamiento por escenario, `Rule` para agrupar reglas de negocio, `Scenario Outline` + `Examples` para variantes, y personas con nombre (Ana, Beto, Carla, Diego) en lugar de "el usuario". Los textos de la UI están en español; los escenarios se refieren a errores por su código (`too_few_participants`) y los pasos los traducen al mensaje visible.
+- `packages/core/features` mantiene el escenario de dominio del sorteo (sin navegador), también con Vitest.
 - Todo cambio de comportamiento parte de un escenario Gherkin que referencie el requisito del PRD (RF-n).
 
 ## 4. Lineamientos de código
