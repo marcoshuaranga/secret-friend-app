@@ -16,14 +16,14 @@ Feature: Pick my own name
 
     @RF-4 @ui
     Scenario: Picking a name asks for confirmation
-      Given Ana opens the event link
+      Given Ana has opened the event link
       When Ana picks "Ana" from the list
       Then Ana is asked to confirm being "Ana"
       And "Ana" is still available
 
     @RF-4 @ui
     Scenario: Confirming the name claims it
-      Given Ana opens the event link
+      Given Ana has opened the event link
       And Ana has picked "Ana" from the list
       When Ana confirms being "Ana"
       Then Ana sees the roulette
@@ -31,7 +31,7 @@ Feature: Pick my own name
 
     @RF-4 @ui
     Scenario: Cancelling the confirmation keeps the name available
-      Given Ana opens the event link
+      Given Ana has opened the event link
       And Ana has picked "Beto" from the list
       When Ana cancels the confirmation
       Then Ana is back on the participant list

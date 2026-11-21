@@ -45,12 +45,6 @@ Feature: Spin the roulette
       When Ana spins the roulette
       Then the roulette stops on the secret friend the server assigned to Ana
 
-    @RF-9 @RF-13
-    Scenario: Replaying the roulette never changes the result
-      Given Ana has spun the roulette
-      When Ana replays the roulette 3 times
-      Then the roulette stops on the same secret friend every time
-
   Rule: The reveal is festive, unless the participant prefers reduced motion
 
     @RF-10

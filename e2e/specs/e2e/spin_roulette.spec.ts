@@ -31,7 +31,6 @@ describeFeature(feature, ({ Background, Rule, AfterEachScenario }) => {
   Rule("The roulette is only visual and always lands on the drawn result", ({ RuleScenario }) => {
     RuleScenario("The roulette never shows my own name", () => {});
     RuleScenario("The roulette lands on the secret friend assigned by the server", () => {});
-    RuleScenario("Replaying the roulette never changes the result", () => {});
   });
 
   Rule(

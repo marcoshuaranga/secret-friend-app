@@ -1,11 +1,11 @@
-import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
+import { describeFeature, loadFeature, type StepTest } from "@amiceli/vitest-cucumber";
 import * as a from "../../support/actions.ts";
 import { pages } from "../../support/contract.ts";
 import { resetWorld, world } from "../../support/world.ts";
 
 const feature = await loadFeature("features/event_link_errors.feature");
 
-describeFeature(feature, ({ Scenario, ScenarioOutline, AfterEachScenario }) => {
+describeFeature(feature, ({ Scenario, ScenarioOutline, Rule, AfterEachScenario }) => {
   AfterEachScenario(resetWorld);
 
   ScenarioOutline("An invalid link shows an error page", ({ When, Then }, { token }) => {
@@ -35,25 +35,6 @@ describeFeature(feature, ({ Scenario, ScenarioOutline, AfterEachScenario }) => {
     });
   });
 
-  ScenarioOutline(
-    "An event expires 90 days after it is created",
-    ({ Given, When, Then }, { age, outcome }) => {
-      Given("an event created <age> days ago", async () => {
-        await a.givenEvent({ name: "Navidad 2026", participants: ["Ana", "Beto", "Carla"] });
-        world().travelDays(Number(age));
-      });
-      When("a visitor opens the event link", async () => {
-        await a.openEventLink("visitor");
-      });
-      Then("the visitor sees <outcome>", async () => {
-        const { page } = await world().device("visitor");
-        if (outcome === "the participant list")
-          await a.testId(page, a.ids.participantList).waitFor();
-        else await a.expectErrorPage("visitor", "expired_link");
-      });
-    },
-  );
-
   Scenario("A new visitor is told when every name is already taken", ({ When, Then }) => {
     When("a visitor opens the event link on a new device", async () => {
       await a.openEventLink("visitor");
@@ -61,5 +42,32 @@ describeFeature(feature, ({ Scenario, ScenarioOutline, AfterEachScenario }) => {
     Then('the visitor sees the "all_names_taken" error page', () =>
       a.expectErrorPage("visitor", "all_names_taken"),
     );
+  });
+
+  Rule("An event expires 90 days after it is created", ({ RuleScenario }) => {
+    const openAgedEvent = ({ Given, When }: Pick<StepTest, "Given" | "When">) => {
+      Given("an event created {int} days ago", async (_ctx: unknown, days: number) => {
+        await a.givenEvent({ name: "Navidad 2026", participants: ["Ana", "Beto", "Carla"] });
+        world().travelDays(days);
+      });
+      When("a visitor opens the event link", async () => {
+        await a.openEventLink("visitor");
+      });
+    };
+
+    RuleScenario("An event can still be opened before it expires", ({ Given, When, Then }) => {
+      openAgedEvent({ Given, When });
+      Then("the visitor sees the participant list", async () => {
+        const { page } = await world().device("visitor");
+        await a.testId(page, a.ids.participantList).waitFor();
+      });
+    });
+
+    RuleScenario("An expired event shows an error page", ({ Given, When, Then }) => {
+      openAgedEvent({ Given, When });
+      Then('the visitor sees the "expired_link" error page', () =>
+        a.expectErrorPage("visitor", "expired_link"),
+      );
+    });
   });
 });

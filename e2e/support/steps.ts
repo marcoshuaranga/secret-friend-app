@@ -126,6 +126,7 @@ defineSteps((keywords) => {
 
   // ---------- Identity ----------
   step("{word} opens the event link", (person: string) => a.openEventLink(person));
+  step("{word} has opened the event link", (person: string) => a.openEventLink(person));
   step("{word} reopens the event link on the same device", (person: string) =>
     a.openEventLink(person),
   );
@@ -230,7 +231,6 @@ defineSteps((keywords) => {
   step("{word} swipes down on the roulette", (person: string) => a.spin(person, "down"));
   step("{word} presses the spin button", (person: string) => a.spin(person));
   step("{word} spins the roulette", (person: string) => a.spin(person));
-  step("{word} has spun the roulette", (person: string) => a.spin(person));
   step("{word} reveals the secret friend", (person: string) => a.spin(person));
   step("{word} has revealed the secret friend", (person: string) => a.spin(person));
   step("the roulette spins", () => a.expectSpun("Ana"));
@@ -241,13 +241,7 @@ defineSteps((keywords) => {
   step("the roulette stops on the secret friend the server assigned to {word}", (person: string) =>
     a.expectRevealedMatchesServer(person),
   );
-  step("{word} replays the roulette {int} times", async (person: string, times: number) => {
-    for (let i = 0; i < times; i++) await a.replay(person);
-  });
   step("{word} replays the reveal animation", (person: string) => a.replay(person));
-  step("the roulette stops on the same secret friend every time", () =>
-    expect(new Set(world().revealed).size).toBe(1),
-  );
   step("the roulette stops on the same secret friend", () =>
     expect(new Set(world().revealed).size).toBe(1),
   );
