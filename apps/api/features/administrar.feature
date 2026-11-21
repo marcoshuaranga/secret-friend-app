@@ -1,6 +1,7 @@
 # language: es
 Característica: Administrar el evento
-  Cubre RF-17 (estado sin asignaciones), RF-18 (liberar un nombre) y RF-19 (editar y eliminar).
+  Cubre RF-17 (estado sin asignaciones), RF-18 (liberar un nombre), RF-19 (editar y eliminar)
+  y RF-22 (un participante que perdió su acceso lo recupera cuando el organizador libera su nombre).
 
   Antecedentes:
     Dado que "Ana" creó el evento "Navidad" con los participantes "Ana, Beto, Carla"
@@ -18,7 +19,7 @@ Característica: Administrar el evento
     Cuando "Beto" abre el panel de "Navidad"
     Entonces la respuesta es 401 con el error "UNAUTHORIZED"
 
-  Escenario: Liberar un nombre permite elegirlo de nuevo y volver a girar
+  Escenario: Liberar un nombre permite elegirlo de nuevo desde otro dispositivo y volver a girar
     Cuando "Ana" libera el nombre "Beto" en "Navidad"
     Entonces la respuesta es 204
     Y "Beto nuevo" puede elegir el nombre "Beto" en "Navidad"

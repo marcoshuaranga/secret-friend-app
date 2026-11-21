@@ -1,12 +1,20 @@
 # language: es
 Característica: Recorrido completo en el navegador
-  Cubre de punta a punta RF-1 a RF-10, RF-14 y RF-16 a RF-21 en un teléfono simulado.
+  Cubre de punta a punta RF-1 a RF-10, RF-14 y RF-16 a RF-21 en un teléfono simulado:
+  RF-3 (copiar el enlace), RF-7 (tirar hacia abajo o botón "Girar") y RF-10 (confeti,
+  vibración y resultado anunciado).
+
+  Escenario: El organizador copia el enlace del evento
+    Dado que Ana crea el evento "Navidad" con "Ana, Beto, Carla, Dani"
+    Cuando Ana copia el enlace
+    Entonces el portapapeles contiene el enlace del evento
 
   Escenario: Crear, elegir nombre, girar una sola vez y revisitar
     Dado que Ana crea el evento "Navidad" con "Ana, Beto, Carla, Dani"
     Cuando Ana elige su nombre "Ana"
     Y Ana tira de la ruleta hacia abajo
-    Entonces Ana ve a quién le regala, y no es ella misma
+    Entonces la ruleta celebra con confeti y vibración y anuncia el resultado
+    Y Ana ve a quién le regala, y no es ella misma
     Cuando Ana vuelve a abrir el enlace
     Entonces Ana ve el mismo resultado sin la ruleta
 

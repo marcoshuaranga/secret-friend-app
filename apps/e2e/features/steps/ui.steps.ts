@@ -46,6 +46,35 @@ When("Ana tira de la ruleta hacia abajo", async function (this: UiWorld) {
   await page.mouse.up();
 });
 
+When("Ana copia el enlace", async function (this: UiWorld) {
+  await (await this.page("Ana")).locator("#copy").click();
+});
+
+Then("el portapapeles contiene el enlace del evento", async function (this: UiWorld) {
+  const page = await this.page("Ana");
+  await page.getByRole("button", { name: "¡Copiado!" }).waitFor();
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), this.eventLink);
+});
+
+Then(
+  "la ruleta celebra con confeti y vibración y anuncia el resultado",
+  async function (this: UiWorld) {
+    const page = await this.page("Ana");
+    await page.waitForFunction(
+      () => document.querySelector("sf-roulette")?.getAttribute("data-state") === "done",
+      undefined,
+      { timeout: 20_000 },
+    );
+    const announced = await page.textContent("[data-announce]");
+    assert.ok(announced && announced !== "Ana", `anuncio: ${announced}`);
+    assert.ok((await page.locator("body > canvas").count()) > 0, "sin confeti");
+    const vibrations = await page.evaluate(
+      () => (window as unknown as { __vibrations: unknown[] }).__vibrations.length,
+    );
+    assert.ok(vibrations > 0, "sin vibración");
+  },
+);
+
 Then("Ana ve a quién le regala, y no es ella misma", async function (this: UiWorld) {
   const page = await this.page("Ana");
   await page.locator("#result").waitFor({ timeout: 20_000 });

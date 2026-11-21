@@ -25,7 +25,20 @@ export class UiWorld extends World {
     const existing = this.pages.get(person);
     if (existing) return existing;
     if (!browser) throw new Error("Chromium no disponible");
-    const context = await browser.newContext({ ...devices["Pixel 7"], baseURL: BASE_URL });
+    const context = await browser.newContext({
+      ...devices["Pixel 7"],
+      baseURL: BASE_URL,
+      permissions: ["clipboard-read", "clipboard-write"],
+    });
+    // Registra las vibraciones para poder comprobarlas (RF-10).
+    await context.addInitScript(() => {
+      const calls: unknown[] = [];
+      Object.defineProperty(window, "__vibrations", { value: calls });
+      navigator.vibrate = (pattern: VibratePattern | Iterable<number>) => {
+        calls.push(pattern);
+        return true;
+      };
+    });
     const page = await context.newPage();
     this.phones.set(person, context);
     this.pages.set(person, page);
